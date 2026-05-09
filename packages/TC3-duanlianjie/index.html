@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>短链接服务</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result.visible {
+            display: block;
+        }
+
+        .result-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .result-url {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .result-url input {
+            background: white;
+            cursor: text;
+        }
+
+        .copy-btn {
+            padding: 10px 16px;
+            background: #28a745;
+            width: auto;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+
+        .error {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f8d7da;
+            color: #721c24;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .error.visible {
+            display: block;
+        }
+
+        .success {
+            margin-top: 15px;
+            padding: 12px;
+            background: #d4edda;
+            color: #155724;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .success.visible {
+            display: block;
+        }
+
+        .section-divider {
+            margin: 30px 0;
+            border-top: 1px solid #e0e0e0;
+            position: relative;
+        }
+
+        .section-divider::after {
+            content: '或';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 0 15px;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .stats-card {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .stats-card.visible {
+            display: block;
+        }
+
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .stats-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .visit-count {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .count-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .visit-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .visit-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid #e8e8e8;
+        }
+
+        .visit-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .visit-time {
+            color: #667eea;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .visit-detail {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .visit-detail-label {
+            color: #999;
+            min-width: 50px;
+        }
+
+        .visit-detail-value {
+            word-break: break-all;
+            flex: 1;
+        }
+
+        .no-visits {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .action-btns button {
+            flex: 1;
+        }
+
+        .stats-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .stats-btn:hover {
+            box-shadow: 0 6px 20px rgba(240, 147, 251, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>短链接服务</h1>
+        
+        <div class="input-group">
+            <label for="urlInput">输入要缩短的链接</label>
+            <input type="url" id="urlInput" placeholder="https://example.com" required>
+        </div>
+        
+        <button id="shortenBtn">生成短链接</button>
+        
+        <div id="error" class="error"></div>
+        <div id="success" class="success"></div>
+        
+        <div id="result" class="result">
+            <div class="result-label">短链接</div>
+            <div class="result-url">
+                <input type="text" id="shortUrl" readonly>
+                <button id="copyBtn" class="copy-btn">复制</button>
+            </div>
+            <button id="viewStatsBtn" class="stats-btn" style="margin-top: 15px; width: 100%;">查看访问统计</button>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="input-group">
+            <label for="statsInput">查询短链接统计</label>
+            <input type="text" id="statsInput" placeholder="输入短码或短链接地址">
+        </div>
+
+        <button id="queryStatsBtn">查询统计</button>
+
+        <div id="statsCard" class="stats-card">
+            <div class="stats-header">
+                <div class="stats-title">访问统计</div>
+                <div class="visit-count">
+                    <span>总访问次数</span>
+                    <span class="count-badge" id="totalVisits">0</span>
+                </div>
+            </div>
+            <div class="result-label" style="margin-bottom: 10px;">原链接</div>
+            <input type="text" id="originalUrlDisplay" readonly style="margin-bottom: 15px;">
+            <div class="result-label" style="margin-bottom: 10px;">最近访问记录</div>
+            <div id="visitList" class="visit-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/shorten';
+        const STATS_API_BASE = '/stats';
+        const BASE_URL = window.location.origin;
+
+        const urlInput = document.getElementById('urlInput');
+        const shortenBtn = document.getElementById('shortenBtn');
+        const resultDiv = document.getElementById('result');
+        const shortUrlInput = document.getElementById('shortUrl');
+        const copyBtn = document.getElementById('copyBtn');
+        const viewStatsBtn = document.getElementById('viewStatsBtn');
+        const statsInput = document.getElementById('statsInput');
+        const queryStatsBtn = document.getElementById('queryStatsBtn');
+        const statsCard = document.getElementById('statsCard');
+        const totalVisitsEl = document.getElementById('totalVisits');
+        const originalUrlDisplay = document.getElementById('originalUrlDisplay');
+        const visitList = document.getElementById('visitList');
+        const errorDiv = document.getElementById('error');
+        const successDiv = document.getElementById('success');
+
+        let currentShortCode = '';
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.classList.add('visible');
+            resultDiv.classList.remove('visible');
+            statsCard.classList.remove('visible');
+            successDiv.classList.remove('visible');
+        }
+
+        function showSuccess(message) {
+            successDiv.textContent = message;
+            successDiv.classList.add('visible');
+            errorDiv.classList.remove('visible');
+            setTimeout(() => {
+                successDiv.classList.remove('visible');
+            }, 3000);
+        }
+
+        function showResult(shortCode) {
+            currentShortCode = shortCode;
+            const fullUrl = `${BASE_URL}/${shortCode}`;
+            shortUrlInput.value = fullUrl;
+            resultDiv.classList.add('visible');
+            errorDiv.classList.remove('visible');
+        }
+
+        function formatDateTime(dateStr) {
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        function renderVisitList(visits) {
+            if (!visits || visits.length === 0) {
+                visitList.innerHTML = '<div class="no-visits">暂无访问记录</div>';
+                return;
+            }
+
+            visitList.innerHTML = visits.map(visit => `
+                <div class="visit-item">
+                    <div class="visit-time">${formatDateTime(visit.access_time)}</div>
+                    <div class="visit-detail">
+                        <span class="visit-detail-label">IP:</span>
+                        <span class="visit-detail-value">${visit.ip_address || '未知'}</span>
+                    </div>
+                    <div class="visit-detail">
+                        <span class="visit-detail-label">UA:</span>
+                        <span class="visit-detail-value">${visit.user_agent || '未知'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadStats(shortCode) {
+            queryStatsBtn.disabled = true;
+            queryStatsBtn.textContent = '查询中...';
+
+            try {
+                const response = await fetch(`${STATS_API_BASE}/${shortCode}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: '未知错误' }));
+                    throw new Error(errorData.detail || `请求失败: ${response.status}`);
+                }
+
+                const data = await response.json();
+                totalVisitsEl.textContent = data.total_visits;
+                originalUrlDisplay.value = data.original_url;
+                renderVisitList(data.recent_visits);
+                statsCard.classList.add('visible');
+                resultDiv.classList.remove('visible');
+                errorDiv.classList.remove('visible');
+                showSuccess('统计数据加载成功！');
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                queryStatsBtn.disabled = false;
+                queryStatsBtn.textContent = '查询统计';
+            }
+        }
+
+        function extractShortCode(input) {
+            input = input.trim();
+            if (!input) return '';
+            
+            try {
+                const url = new URL(input);
+                const pathParts = url.pathname.split('/').filter(p => p);
+                if (pathParts.length >= 1) {
+                    return pathParts[pathParts.length - 1];
+                }
+            } catch (e) {
+            }
+            return input;
+        }
+
+        async function shortenUrl() {
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showError('请输入一个 URL');
+                return;
+            }
+
+            try {
+                new URL(url);
+            } catch (e) {
+                showError('请输入有效的 URL（需要包含 http:// 或 https://）');
+                return;
+            }
+
+            shortenBtn.disabled = true;
+            shortenBtn.textContent = '生成中...';
+
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: '未知错误' }));
+                    throw new Error(errorData.detail || `请求失败: ${response.status}`);
+                }
+
+                const data = await response.json();
+                showResult(data.short_code);
+                showSuccess('短链接生成成功！');
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                shortenBtn.disabled = false;
+                shortenBtn.textContent = '生成短链接';
+            }
+        }
+
+        async function copyToClipboard() {
+            try {
+                await navigator.clipboard.writeText(shortUrlInput.value);
+                showSuccess('已复制到剪贴板！');
+            } catch (error) {
+                shortUrlInput.select();
+                document.execCommand('copy');
+                showSuccess('已复制到剪贴板！');
+            }
+        }
+
+        async function queryStats() {
+            const input = statsInput.value.trim();
+            if (!input) {
+                showError('请输入短码或短链接地址');
+                return;
+            }
+            const shortCode = extractShortCode(input);
+            if (!shortCode) {
+                showError('无法解析短码');
+                return;
+            }
+            await loadStats(shortCode);
+        }
+
+        shortenBtn.addEventListener('click', shortenUrl);
+        copyBtn.addEventListener('click', copyToClipboard);
+        queryStatsBtn.addEventListener('click', queryStats);
+        
+        viewStatsBtn.addEventListener('click', () => {
+            if (currentShortCode) {
+                loadStats(currentShortCode);
+            }
+        });
+        
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                shortenUrl();
+            }
+        });
+
+        statsInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                queryStats();
+            }
+        });
+    </script>
+</body>
+</html>
