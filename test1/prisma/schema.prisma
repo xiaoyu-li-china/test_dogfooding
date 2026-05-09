@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model WebhookEvent {
+  id           String   @id @default(cuid())
+  eventId      String   @unique
+  payloadHash  String
+  receivedAt   DateTime @default(now())
+  status       String   @default("PENDING")
+  retryCount   Int      @default(0)
+  lastRetryAt  DateTime?
+  nextRetryAt  DateTime?
+  errorMessage String?
+
+  @@index([status])
+  @@index([eventId])
+}
