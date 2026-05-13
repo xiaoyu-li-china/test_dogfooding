@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>便签管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="header-left">
+        <h1 class="title">📝 便签管理</h1>
+        <span class="version">v{{ appVersion }}</span>
+      </div>
+      <div class="header-right">
+        <div v-if="updateStatus.message" class="update-status" :class="updateStatus.status">
+          <span class="update-icon">🔄</span>
+          <span>{{ updateStatus.message }}</span>
+          <button 
+            v-if="updateStatus.status === 'available'" 
+            class="btn-update"
+            @click="downloadUpdate"
+          >
+            下载
+          </button>
+          <button 
+            v-if="updateStatus.status === 'downloaded'" 
+            class="btn-update btn-install"
+            @click="installUpdate"
+          >
+            安装更新
+          </button>
+        </div>
+        <button class="btn-check-update" @click="checkUpdates" title="检查更新">
+          🔍
+        </button>
+        <button class="btn-create" @click="createNote">
+          <span class="icon">+</span>
+          新建便签
+        </button>
+      </div>
+    </header>
+    
+    <main class="main">
+      <div v-if="notes.length === 0" class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h2>暂无便签</h2>
+        <p>点击"新建便签"开始创建你的第一个便签</p>
+      </div>
+      
+      <div v-else class="notes-grid">
+        <div
+          v-for="note in notes"
+          :key="note.id"
+          class="note-card"
+          :style="{ backgroundColor: note.color }"
+          @dblclick="openNote(note.id)"
+          draggable="true"
+          @dragstart="handleDragStart($event, note)"
+          @dragend="handleDragEnd($event)"
+          @dragover="handleDragOver($event, note)"
+          @drop="handleDrop($event, note)"
+        >
+          <div class="note-header">
+            <h3 class="note-title" :title="note.title || '无标题'">
+              {{ note.title || '无标题' }}
+            </h3>
+            <button 
+              class="btn-delete" 
+              @click.stop="deleteNote(note.id)"
+              title="删除便签"
+            >
+              ×
+            </button>
+          </div>
+          <div class="note-preview">
+            {{ previewContent(note.content) }}
+          </div>
+          <div class="note-footer">
+            <span class="note-date">{{ formatDate(note.updatedAt) }}</span>
+            <button 
+              class="btn-open" 
+              @click.stop="openNote(note.id)"
+              title="打开便签"
+            >
+              打开
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  
+  <script src="vue.global.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "rules": [
+    {
+      "folder": "Images",
+      "extensions": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp"],
+      "subfolder": {
+        "type": "date",
+        "pattern": "%Y-%m"
+      }
+    },
+    {
+      "folder": "Documents",
+      "extensions": [".pdf", ".docx", ".doc", ".txt", ".rtf", ".odt"]
+    },
+    {
+      "folder": "Videos",
+      "extensions": [".mp4", ".avi", ".mov", ".mkv", ".webm"],
+      "subfolder": {
+        "type": "date",
+        "pattern": "%Y/%m"
+      }
+    },
+    {
+      "folder": "Audio",
+      "extensions": [".mp3", ".wav", ".flac", ".aac", ".ogg"]
+    },
+    {
+      "folder": "Archives",
+      "extensions": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2"]
+    }
+  ]
+}

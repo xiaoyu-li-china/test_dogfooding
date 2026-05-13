@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+transformers
+torch
+pytest
+pytest-asyncio
+httpx
+sqlalchemy
+celery
+redis
+pydantic-settings
+httpx
+python-dotenv

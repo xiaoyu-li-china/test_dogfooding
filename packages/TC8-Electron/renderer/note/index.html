@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>便签</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" :style="{ backgroundColor: note.color }">
+    <div class="note-window">
+      <header class="title-bar" @mousedown="startDrag">
+        <input
+          v-model="note.title"
+          type="text"
+          class="title-input"
+          placeholder="便签标题..."
+          @mousedown.stop
+          @input="saveNote"
+        >
+        <div class="title-bar-buttons">
+          <button 
+            class="btn-menu" 
+            @click.stop="toggleColorPicker"
+            title="更换颜色"
+          >
+            🎨
+          </button>
+          <button 
+            class="btn-minimize" 
+            @click.stop="minimizeWindow"
+            title="最小化"
+          >
+            –
+          </button>
+          <button 
+            class="btn-close" 
+            @click.stop="closeWindow"
+            title="关闭"
+          >
+            ×
+          </button>
+        </div>
+      </header>
+      
+      <div 
+        v-if="showColorPicker" 
+        class="color-picker"
+        @mousedown.stop
+      >
+        <button
+          v-for="color in colorOptions"
+          :key="color"
+          class="color-option"
+          :style="{ backgroundColor: color }"
+          :class="{ active: note.color === color }"
+          @click="changeColor(color)"
+        ></button>
+      </div>
+      
+      <main class="content-area">
+        <textarea
+          v-model="note.content"
+          class="content-textarea"
+          placeholder="在这里输入便签内容..."
+          @input="saveNote"
+          @dblclick="editTitle"
+        ></textarea>
+      </main>
+      
+      <footer class="status-bar">
+        <span class="last-saved">{{ lastSavedText }}</span>
+      </footer>
+    </div>
+  </div>
+  
+  <script src="../main/vue.global.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

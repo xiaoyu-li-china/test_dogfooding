@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>响应式图片画廊 - 瀑布流</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+            font-size: 2.5rem;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .sort-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .sort-select {
+            padding: 10px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .sort-select:hover {
+            border-color: #999;
+        }
+
+        .sort-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .gallery {
+            column-count: 4;
+            column-gap: 20px;
+        }
+
+        .gallery-item {
+            position: relative;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            margin-bottom: 20px;
+            break-inside: avoid;
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .gallery-item img.loaded {
+            opacity: 1;
+        }
+
+        .placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #999;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .load-more-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+
+        .load-more-btn {
+            padding: 14px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .load-more-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .load-more-btn:active {
+            transform: translateY(0);
+        }
+
+        .load-more-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            animation: zoomIn 0.3s ease;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s ease;
+            z-index: 1001;
+        }
+
+        .modal-close:hover {
+            color: #ccc;
+        }
+
+        .modal-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+        }
+
+        .modal-nav:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-prev {
+            left: 30px;
+        }
+
+        .modal-next {
+            right: 30px;
+        }
+
+        .modal-counter {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes zoomIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @media (max-width: 1200px) {
+            .gallery {
+                column-count: 3;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+                margin-bottom: 20px;
+            }
+
+            .gallery {
+                column-count: 2;
+                column-gap: 10px;
+            }
+
+            .gallery-item {
+                margin-bottom: 10px;
+            }
+
+            .modal-close {
+                font-size: 30px;
+                top: 10px;
+                right: 20px;
+            }
+
+            .modal-nav {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+
+            .modal-prev {
+                left: 10px;
+            }
+
+            .modal-next {
+                right: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .gallery {
+                column-count: 1;
+            }
+
+            .controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>响应式图片画廊</h1>
+        
+        <div class="controls">
+            <span class="sort-label">排序方式：</span>
+            <select class="sort-select" id="sortSelect">
+                <option value="default">默认排序</option>
+                <option value="size-asc">按尺寸（小→大）</option>
+                <option value="size-desc">按尺寸（大→小）</option>
+                <option value="time-asc">按时间（旧→新）</option>
+                <option value="time-desc">按时间（新→旧）</option>
+            </select>
+        </div>
+
+        <div class="gallery" id="gallery"></div>
+
+        <div class="load-more-wrapper">
+            <button class="load-more-btn" id="loadMoreBtn">加载更多</button>
+        </div>
+    </div>
+
+    <div class="modal" id="modal">
+        <span class="modal-close" id="closeBtn">&times;</span>
+        <button class="modal-nav modal-prev" id="prevBtn">&#8249;</button>
+        <button class="modal-nav modal-next" id="nextBtn">&#8250;</button>
+        <img class="modal-content" id="modalImage" src="" alt="大图">
+        <div class="modal-counter" id="modalCounter">1 / 50</div>
+    </div>
+
+    <script>
+        const aspectRatios = [
+            { w: 4, h: 3 },
+            { w: 1, h: 1 },
+            { w: 3, h: 4 },
+            { w: 16, h: 9 },
+            { w: 9, h: 16 },
+            { w: 3, h: 2 },
+            { w: 2, h: 3 }
+        ];
+
+        function generateImageData(count, startIndex = 1) {
+            const data = [];
+            const now = Date.now();
+            
+            for (let i = 0; i < count; i++) {
+                const index = startIndex + i;
+                const ratio = aspectRatios[i % aspectRatios.length];
+                const width = 800;
+                const height = Math.round(width * (ratio.h / ratio.w));
+                const size = Math.round(width * height * 0.1 + Math.random() * 50000);
+                const uploadTime = now - (index * 3600000 * Math.random() * 24);
+                
+                data.push({
+                    id: index,
+                    url: `https://picsum.photos/${width}/${height}?random=${index}`,
+                    thumbnail: `https://picsum.photos/400/${Math.round(400 * ratio.h / ratio.w)}?random=${index}`,
+                    width,
+                    height,
+                    size,
+                    uploadTime,
+                    aspectRatio: ratio.w / ratio.h
+                });
+            }
+            
+            return data;
+        }
+
+        const allImageData = generateImageData(100);
+        
+        const gallery = document.getElementById('gallery');
+        const modal = document.getElementById('modal');
+        const modalImage = document.getElementById('modalImage');
+        const modalCounter = document.getElementById('modalCounter');
+        const closeBtn = document.getElementById('closeBtn');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const sortSelect = document.getElementById('sortSelect');
+        const loadMoreBtn = document.getElementById('loadMoreBtn');
+
+        let currentDisplayedImages = [];
+        let loadCount = 50;
+        let currentImageIndex = 0;
+        let touchStartX = 0;
+        let touchEndX = 0;
+        let observer = null;
+        let scrollTimeout = null;
+
+        function getCurrentSort() {
+            return sortSelect.value;
+        }
+
+        function sortImages(data, sortType) {
+            const sorted = [...data];
+            
+            switch (sortType) {
+                case 'size-asc':
+                    sorted.sort((a, b) => a.size - b.size);
+                    break;
+                case 'size-desc':
+                    sorted.sort((a, b) => b.size - a.size);
+                    break;
+                case 'time-asc':
+                    sorted.sort((a, b) => a.uploadTime - b.uploadTime);
+                    break;
+                case 'time-desc':
+                    sorted.sort((a, b) => b.uploadTime - a.uploadTime);
+                    break;
+                default:
+                    sorted.sort((a, b) => a.id - b.id);
+            }
+            
+            return sorted;
+        }
+
+        function createGalleryItem(imageData, displayIndex) {
+            const item = document.createElement('div');
+            item.className = 'gallery-item';
+            
+            const img = document.createElement('img');
+            img.dataset.src = imageData.thumbnail;
+            img.alt = `图片 ${imageData.id}`;
+            img.dataset.fullUrl = imageData.url;
+            
+            const placeholder = document.createElement('div');
+            placeholder.className = 'placeholder';
+            placeholder.textContent = '加载中...';
+            
+            item.appendChild(img);
+            item.appendChild(placeholder);
+            
+            item.addEventListener('click', () => {
+                openModal(displayIndex);
+            });
+            
+            return item;
+        }
+
+        function renderGallery() {
+            gallery.innerHTML = '';
+            
+            const sortedData = sortImages(allImageData, getCurrentSort());
+            currentDisplayedImages = sortedData.slice(0, loadCount);
+            
+            currentDisplayedImages.forEach((imageData, displayIndex) => {
+                const item = createGalleryItem(imageData, displayIndex);
+                gallery.appendChild(item);
+            });
+            
+            updateLoadMoreButton();
+            setupLazyLoading();
+        }
+
+        function appendGallery() {
+            const sortedData = sortImages(allImageData, getCurrentSort());
+            const newStart = currentDisplayedImages.length;
+            const newEnd = Math.min(newStart + 20, sortedData.length);
+            const newImages = sortedData.slice(newStart, newEnd);
+            
+            newImages.forEach((imageData, offsetIndex) => {
+                const displayIndex = newStart + offsetIndex;
+                const item = createGalleryItem(imageData, displayIndex);
+                gallery.appendChild(item);
+            });
+            
+            currentDisplayedImages = sortedData.slice(0, newEnd);
+            updateLoadMoreButton();
+            setupLazyLoading();
+        }
+
+        function updateLoadMoreButton() {
+            if (currentDisplayedImages.length >= allImageData.length) {
+                loadMoreBtn.textContent = '已加载全部';
+                loadMoreBtn.disabled = true;
+            } else {
+                loadMoreBtn.textContent = `加载更多（${currentDisplayedImages.length}/${allImageData.length}）`;
+                loadMoreBtn.disabled = false;
+            }
+        }
+
+        function loadImage(img, placeholder) {
+            if (!img.dataset.src) return;
+            
+            img.src = img.dataset.src;
+            img.onload = () => {
+                img.classList.add('loaded');
+                placeholder.style.display = 'none';
+            };
+            img.removeAttribute('data-src');
+        }
+
+        function checkVisibleImages() {
+            const items = document.querySelectorAll('.gallery-item img[data-src]');
+            const viewportHeight = window.innerHeight;
+            
+            items.forEach(img => {
+                const rect = img.getBoundingClientRect();
+                if (rect.top < viewportHeight + 400 && rect.bottom > -200) {
+                    const placeholder = img.nextElementSibling;
+                    loadImage(img, placeholder);
+                }
+            });
+        }
+
+        function setupLazyLoading() {
+            if (observer) {
+                observer.disconnect();
+            }
+            
+            const observerOptions = {
+                root: null,
+                rootMargin: '400px 0px',
+                threshold: 0
+            };
+
+            observer = new IntersectionObserver((entries, obs) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target.querySelector('img');
+                        const placeholder = entry.target.querySelector('.placeholder');
+                        loadImage(img, placeholder);
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                observer.observe(item);
+            });
+
+            if (scrollTimeout) {
+                clearTimeout(scrollTimeout);
+            }
+            window.removeEventListener('scroll', handleScroll);
+            window.addEventListener('scroll', handleScroll, { passive: true });
+        }
+
+        function handleScroll() {
+            if (scrollTimeout) {
+                clearTimeout(scrollTimeout);
+            }
+            scrollTimeout = setTimeout(() => {
+                checkVisibleImages();
+            }, 100);
+        }
+
+        function openModal(index) {
+            currentImageIndex = index;
+            const imageData = currentDisplayedImages[index];
+            modalImage.src = imageData.url;
+            modalCounter.textContent = `${index + 1} / ${currentDisplayedImages.length}`;
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function prevImage() {
+            currentImageIndex = (currentImageIndex - 1 + currentDisplayedImages.length) % currentDisplayedImages.length;
+            const imageData = currentDisplayedImages[currentImageIndex];
+            modalImage.src = imageData.url;
+            modalCounter.textContent = `${currentImageIndex + 1} / ${currentDisplayedImages.length}`;
+        }
+
+        function nextImage() {
+            currentImageIndex = (currentImageIndex + 1) % currentDisplayedImages.length;
+            const imageData = currentDisplayedImages[currentImageIndex];
+            modalImage.src = imageData.url;
+            modalCounter.textContent = `${currentImageIndex + 1} / ${currentDisplayedImages.length}`;
+        }
+
+        closeBtn.addEventListener('click', closeModal);
+        prevBtn.addEventListener('click', prevImage);
+        nextBtn.addEventListener('click', nextImage);
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        modal.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        modal.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, { passive: true });
+
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    nextImage();
+                } else {
+                    prevImage();
+                }
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (!modal.classList.contains('active')) return;
+            
+            if (e.key === 'Escape') {
+                closeModal();
+            } else if (e.key === 'ArrowLeft') {
+                prevImage();
+            } else if (e.key === 'ArrowRight') {
+                nextImage();
+            }
+        });
+
+        sortSelect.addEventListener('change', () => {
+            loadCount = currentDisplayedImages.length;
+            renderGallery();
+        });
+
+        loadMoreBtn.addEventListener('click', appendGallery);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderGallery();
+        });
+    </script>
+</body>
+</html>

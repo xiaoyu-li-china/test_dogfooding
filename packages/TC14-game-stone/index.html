@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打砖块游戏</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        canvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+            background: #2c3e50;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            padding: 15px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 10px;
+            color: white;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            margin: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active {
+            transform: translateY(-1px);
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .game-over-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .game-over-screen h2 {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .game-over-screen p {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎮 打砖块游戏</h1>
+        
+        <div class="game-info">
+            <span id="score">得分: 0</span>
+            <span id="lives">生命: ❤️ ❤️ ❤️</span>
+        </div>
+        
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div>
+            <button id="restartBtn">🔄 重新开始</button>
+        </div>
+        
+        <div class="instructions">
+            <p>🎯 使用 ← → 方向键或鼠标移动挡板</p>
+            <p>🎯 击碎所有砖块即可获胜</p>
+            <p>🎯 你有 3 条生命</p>
+            <p><strong>道具说明：</strong></p>
+            <p>🟢 ▶ 扩大挡板 | 🔴 ◀ 缩短挡板 | 🟡 ● 多球 | 🟣 ⚡ 加速球</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const restartBtn = document.getElementById('restartBtn');
+
+        let score = 0;
+        let lives = 3;
+        let gameRunning = true;
+        let gameWon = false;
+
+        let balls = [];
+
+        function createBall(x, y, dx, dy, speed, color) {
+            return {
+                x: x || canvas.width / 2,
+                y: y || canvas.height - 50,
+                radius: 8,
+                dx: dx || speed * (Math.random() > 0.5 ? 1 : -1),
+                dy: dy || -speed,
+                speed: speed || 4,
+                color: color || '#fff',
+                active: true
+            };
+        }
+
+        const paddle = {
+            width: 100,
+            height: 12,
+            x: (canvas.width - 100) / 2,
+            y: canvas.height - 30,
+            speed: 8,
+            color: '#fff',
+            movingLeft: false,
+            movingRight: false,
+            baseWidth: 100
+        };
+
+        const brickConfig = {
+            rows: 5,
+            cols: 10,
+            width: 70,
+            height: 25,
+            padding: 8,
+            offsetTop: 50,
+            offsetLeft: 25,
+            colors: ['#ff6b6b', '#feca57', '#48dbfb', '#1dd1a1', '#5f27cd']
+        };
+
+        let bricks = [];
+
+        const powerUpTypes = {
+            expand: {
+                name: '扩大挡板',
+                color: '#1dd1a1',
+                symbol: '▶',
+                duration: 10000,
+                paddleWidthChange: 60
+            },
+            shrink: {
+                name: '缩短挡板',
+                color: '#ff6b6b',
+                symbol: '◀',
+                duration: 8000,
+                paddleWidthChange: -40
+            },
+            multiBall: {
+                name: '多球',
+                color: '#feca57',
+                symbol: '●',
+                duration: 0,
+                ballsToAdd: 2
+            },
+            speedUp: {
+                name: '加速球',
+                color: '#5f27cd',
+                symbol: '⚡',
+                duration: 8000,
+                speedMultiplier: 1.5
+            }
+        };
+
+        let powerUps = [];
+        let activePowerUps = {};
+        let baseBallSpeed = 4;
+
+        function createBricks() {
+            bricks = [];
+            for (let row = 0; row < brickConfig.rows; row++) {
+                bricks[row] = [];
+                for (let col = 0; col < brickConfig.cols; col++) {
+                    bricks[row][col] = {
+                        x: col * (brickConfig.width + brickConfig.padding) + brickConfig.offsetLeft,
+                        y: row * (brickConfig.height + brickConfig.padding) + brickConfig.offsetTop,
+                        status: 1,
+                        color: brickConfig.colors[row]
+                    };
+                }
+            }
+        }
+
+        function drawBalls() {
+            balls.forEach(ball => {
+                if (ball.active) {
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = ball.color;
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            });
+        }
+
+        function drawPaddle() {
+            const originalColor = paddle.color;
+            if (activePowerUps.expand) {
+                paddle.color = '#1dd1a1';
+            } else if (activePowerUps.shrink) {
+                paddle.color = '#ff6b6b';
+            } else {
+                paddle.color = '#fff';
+            }
+            
+            ctx.beginPath();
+            ctx.roundRect(paddle.x, paddle.y, paddle.width, paddle.height, 6);
+            ctx.fillStyle = paddle.color;
+            ctx.fill();
+            ctx.closePath();
+            
+            paddle.color = originalColor;
+        }
+
+        function drawBricks() {
+            for (let row = 0; row < brickConfig.rows; row++) {
+                for (let col = 0; col < brickConfig.cols; col++) {
+                    const brick = bricks[row][col];
+                    if (brick.status === 1) {
+                        ctx.beginPath();
+                        ctx.roundRect(brick.x, brick.y, brickConfig.width, brickConfig.height, 4);
+                        ctx.fillStyle = brick.color;
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+
+        function drawPowerUps() {
+            powerUps.forEach(powerUp => {
+                ctx.beginPath();
+                ctx.roundRect(powerUp.x, powerUp.y, 30, 30, 6);
+                ctx.fillStyle = powerUp.color;
+                ctx.fill();
+                ctx.closePath();
+                
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#fff';
+                ctx.fillText(powerUp.symbol, powerUp.x + 15, powerUp.y + 15);
+            });
+        }
+
+        function movePaddle() {
+            if (paddle.movingLeft && paddle.x > 0) {
+                paddle.x -= paddle.speed;
+            }
+            if (paddle.movingRight && paddle.x < canvas.width - paddle.width) {
+                paddle.x += paddle.speed;
+            }
+        }
+
+        function moveBalls() {
+            let activeBalls = 0;
+            
+            balls.forEach(ball => {
+                if (!ball.active) return;
+                
+                activeBalls++;
+                ball.x += ball.dx;
+                ball.y += ball.dy;
+
+                if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+                    ball.dx = -ball.dx;
+                }
+                if (ball.y - ball.radius < 0) {
+                    ball.dy = -ball.dy;
+                }
+
+                if (
+                    ball.dy > 0 &&
+                    ball.y + ball.radius > paddle.y &&
+                    ball.y - ball.radius < paddle.y + paddle.height &&
+                    ball.x > paddle.x &&
+                    ball.x < paddle.x + paddle.width
+                ) {
+                    const hitPoint = (ball.x - paddle.x) / paddle.width;
+                    const offset = hitPoint - 0.5;
+                    const maxAngle = Math.PI / 3;
+                    const angle = offset * maxAngle;
+                    ball.dx = ball.speed * Math.sin(angle);
+                    ball.dy = -Math.abs(ball.speed * Math.cos(angle));
+                }
+
+                if (ball.y + ball.radius > canvas.height) {
+                    ball.active = false;
+                }
+            });
+            
+            const liveBalls = balls.filter(b => b.active);
+            if (liveBalls.length === 0) {
+                lives--;
+                updateLivesDisplay();
+                
+                if (lives <= 0) {
+                    gameRunning = false;
+                    showGameOver(false);
+                } else {
+                    resetBalls();
+                }
+            }
+        }
+
+        function checkBrickCollision() {
+            let allBricksDestroyed = true;
+            
+            balls.forEach(ball => {
+                if (!ball.active) return;
+                
+                for (let row = 0; row < brickConfig.rows; row++) {
+                    for (let col = 0; col < brickConfig.cols; col++) {
+                        const brick = bricks[row][col];
+                        
+                        if (brick.status === 1) {
+                            if (
+                                ball.x > brick.x &&
+                                ball.x < brick.x + brickConfig.width &&
+                                ball.y > brick.y &&
+                                ball.y < brick.y + brickConfig.height
+                            ) {
+                                ball.dy = -ball.dy;
+                                brick.status = 0;
+                                score += 10;
+                                updateScoreDisplay();
+                                
+                                baseBallSpeed += 0.05;
+                                if (!activePowerUps.speedUp) {
+                                    ball.speed = baseBallSpeed;
+                                }
+                                
+                                if (Math.random() < 0.3) {
+                                    spawnPowerUp(brick.x + brickConfig.width / 2, brick.y);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            for (let row = 0; row < brickConfig.rows; row++) {
+                for (let col = 0; col < brickConfig.cols; col++) {
+                    if (bricks[row][col].status === 1) {
+                        allBricksDestroyed = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allBricksDestroyed) {
+                gameWon = true;
+                gameRunning = false;
+                showGameOver(true);
+            }
+        }
+
+        function spawnPowerUp(x, y) {
+            const types = Object.keys(powerUpTypes);
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            const typeConfig = powerUpTypes[randomType];
+            
+            powerUps.push({
+                type: randomType,
+                x: x - 15,
+                y: y,
+                width: 30,
+                height: 30,
+                dy: 3,
+                color: typeConfig.color,
+                symbol: typeConfig.symbol,
+                name: typeConfig.name
+            });
+        }
+
+        function movePowerUps() {
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                const powerUp = powerUps[i];
+                powerUp.y += powerUp.dy;
+                
+                if (
+                    powerUp.y + powerUp.height > paddle.y &&
+                    powerUp.y < paddle.y + paddle.height &&
+                    powerUp.x + powerUp.width > paddle.x &&
+                    powerUp.x < paddle.x + paddle.width
+                ) {
+                    activatePowerUp(powerUp.type);
+                    powerUps.splice(i, 1);
+                } else if (powerUp.y > canvas.height) {
+                    powerUps.splice(i, 1);
+                }
+            }
+        }
+
+        function activatePowerUp(type) {
+            const config = powerUpTypes[type];
+            
+            switch (type) {
+                case 'expand':
+                    if (activePowerUps.expand) {
+                        clearTimeout(activePowerUps.expand);
+                    }
+                    if (activePowerUps.shrink) {
+                        clearTimeout(activePowerUps.shrink);
+                        delete activePowerUps.shrink;
+                    }
+                    paddle.width = paddle.baseWidth + config.paddleWidthChange;
+                    activePowerUps.expand = setTimeout(() => {
+                        paddle.width = paddle.baseWidth;
+                        delete activePowerUps.expand;
+                    }, config.duration);
+                    break;
+                    
+                case 'shrink':
+                    if (activePowerUps.shrink) {
+                        clearTimeout(activePowerUps.shrink);
+                    }
+                    if (activePowerUps.expand) {
+                        clearTimeout(activePowerUps.expand);
+                        delete activePowerUps.expand;
+                    }
+                    paddle.width = paddle.baseWidth + config.paddleWidthChange;
+                    activePowerUps.shrink = setTimeout(() => {
+                        paddle.width = paddle.baseWidth;
+                        delete activePowerUps.shrink;
+                    }, config.duration);
+                    break;
+                    
+                case 'multiBall':
+                    const existingBalls = balls.filter(b => b.active);
+                    existingBalls.forEach(ball => {
+                        for (let i = 0; i < config.ballsToAdd; i++) {
+                            const angleOffset = (i === 0 ? 0.5 : -0.5) * Math.PI / 4;
+                            const magnitude = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+                            const currentAngle = Math.atan2(ball.dy, ball.dx);
+                            const newAngle = currentAngle + angleOffset;
+                            
+                            balls.push(createBall(
+                                ball.x,
+                                ball.y,
+                                magnitude * Math.cos(newAngle),
+                                magnitude * Math.sin(newAngle),
+                                ball.speed,
+                                '#feca57'
+                            ));
+                        }
+                    });
+                    break;
+                    
+                case 'speedUp':
+                    if (activePowerUps.speedUp) {
+                        clearTimeout(activePowerUps.speedUp);
+                    }
+                    balls.forEach(ball => {
+                        if (ball.active) {
+                            ball.speed = baseBallSpeed * config.speedMultiplier;
+                            const magnitude = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+                            const scale = ball.speed / magnitude;
+                            ball.dx *= scale;
+                            ball.dy *= scale;
+                        }
+                    });
+                    activePowerUps.speedUp = setTimeout(() => {
+                        balls.forEach(ball => {
+                            if (ball.active) {
+                                ball.speed = baseBallSpeed;
+                                const magnitude = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+                                const scale = ball.speed / magnitude;
+                                ball.dx *= scale;
+                                ball.dy *= scale;
+                            }
+                        });
+                        delete activePowerUps.speedUp;
+                    }, config.duration);
+                    break;
+            }
+        }
+
+        function resetBalls() {
+            Object.keys(activePowerUps).forEach(key => {
+                clearTimeout(activePowerUps[key]);
+                delete activePowerUps[key];
+            });
+            paddle.width = paddle.baseWidth;
+            powerUps = [];
+            
+            balls = [createBall(
+                canvas.width / 2,
+                canvas.height - 50,
+                baseBallSpeed * (Math.random() > 0.5 ? 1 : -1),
+                -baseBallSpeed,
+                baseBallSpeed,
+                '#fff'
+            )];
+            paddle.x = (canvas.width - paddle.width) / 2;
+        }
+
+        function updateScoreDisplay() {
+            scoreElement.textContent = `得分: ${score}`;
+        }
+
+        function updateLivesDisplay() {
+            let livesDisplay = '';
+            for (let i = 0; i < lives; i++) {
+                livesDisplay += '❤️ ';
+            }
+            livesElement.textContent = `生命: ${livesDisplay}`;
+        }
+
+        function showGameOver(won) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = won ? '#1dd1a1' : '#ff6b6b';
+            ctx.fillText(won ? '🎉 游戏胜利！' : '💔 游戏结束', canvas.width / 2, canvas.height / 2 - 50);
+            
+            ctx.font = '24px Arial';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`最终得分: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+            
+            ctx.font = '20px Arial';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText('点击"重新开始"按钮继续游戏', canvas.width / 2, canvas.height / 2 + 60);
+        }
+
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            gameRunning = true;
+            gameWon = false;
+            baseBallSpeed = 4;
+            createBricks();
+            resetBalls();
+            updateScoreDisplay();
+            updateLivesDisplay();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawBricks();
+            drawBalls();
+            drawPowerUps();
+            drawPaddle();
+            
+            if (gameRunning) {
+                movePaddle();
+                moveBalls();
+                checkBrickCollision();
+                movePowerUps();
+            }
+            
+            requestAnimationFrame(draw);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                paddle.movingLeft = true;
+            }
+            if (e.key === 'ArrowRight') {
+                paddle.movingRight = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') {
+                paddle.movingLeft = false;
+            }
+            if (e.key === 'ArrowRight') {
+                paddle.movingRight = false;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            paddle.x = mouseX - paddle.width / 2;
+            
+            if (paddle.x < 0) {
+                paddle.x = 0;
+            }
+            if (paddle.x > canvas.width - paddle.width) {
+                paddle.x = canvas.width - paddle.width;
+            }
+        });
+
+        restartBtn.addEventListener('click', resetGame);
+
+        createBricks();
+        resetBalls();
+        draw();
+    </script>
+</body>
+</html>

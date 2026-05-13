@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:8-alpine
+    container_name: taskqueue-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - taskqueue-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskqueue-api
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_ADDR: redis:6379
+      REDIS_DB: "0"
+      HTTP_PORT: "8081"
+      QUEUE_KEY: task_queue
+      RESULT_PREFIX: "task_result:"
+      WORKER_COUNT: "0"
+      TASK_SLEEP_SECONDS: "2"
+      RESULT_TTL_HOURS: "24"
+      ENABLE_WORKER: "false"
+      ENABLE_API: "true"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - taskqueue-network
+
+  worker-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskqueue-worker-1
+    restart: always
+    environment:
+      REDIS_ADDR: redis:6379
+      REDIS_DB: "0"
+      WORKER_COUNT: "2"
+      TASK_SLEEP_SECONDS: "2"
+      RESULT_TTL_HOURS: "24"
+      ENABLE_WORKER: "true"
+      ENABLE_API: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - taskqueue-network
+
+  worker-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskqueue-worker-2
+    restart: always
+    environment:
+      REDIS_ADDR: redis:6379
+      REDIS_DB: "0"
+      WORKER_COUNT: "2"
+      TASK_SLEEP_SECONDS: "2"
+      RESULT_TTL_HOURS: "24"
+      ENABLE_WORKER: "true"
+      ENABLE_API: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - taskqueue-network
+
+  worker-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskqueue-worker-3
+    restart: always
+    environment:
+      REDIS_ADDR: redis:6379
+      REDIS_DB: "0"
+      WORKER_COUNT: "2"
+      TASK_SLEEP_SECONDS: "2"
+      RESULT_TTL_HOURS: "24"
+      ENABLE_WORKER: "true"
+      ENABLE_API: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - taskqueue-network
+
+volumes:
+  redis-data:
+
+networks:
+  taskqueue-network:
+    driver: bridge

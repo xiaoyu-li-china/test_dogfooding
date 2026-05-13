@@ -1,0 +1,262 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      tag_name: ${{ steps.get_tag.outputs.tag_name }}
+    steps:
+      - name: Get Tag Name
+        id: get_tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag_name=dev-release" >> $GITHUB_OUTPUT
+          else
+            echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag_name }}
+          release_name: 屏幕取色器 ${{ steps.get_tag.outputs.tag_name }}
+          draft: false
+          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+
+  build-windows:
+    name: Build (Windows)
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Import Windows Code Signing Certificate
+        if: secrets.WINDOWS_CERTIFICATE != ''
+        shell: powershell
+        run: |
+          $certBytes = [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}")
+          $certFile = Join-Path -Path $env:RUNNER_TEMP -ChildPath "certificate.pfx"
+          [System.IO.File]::WriteAllBytes($certFile, $certBytes)
+          Import-PfxCertificate -FilePath $certFile -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" -AsPlainText -Force)
+          echo "WINDOWS_CERT_PATH=$certFile" >> $env:GITHUB_ENV
+
+      - name: Build Tauri App
+        run: npm run tauri build
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+
+      - name: Sign Executable
+        if: secrets.WINDOWS_CERTIFICATE != ''
+        shell: powershell
+        run: |
+          $signtool = Get-ChildItem -Path "${{ env:WindowsKitsPath }}\bin" -Recurse -Filter signtool.exe | Select-Object -First 1 -ExpandProperty FullName
+          $executablePath = Get-ChildItem -Path "src-tauri\target\release\bundle" -Recurse -Filter "*.exe" | Select-Object -First 1 -ExpandProperty FullName
+          & $signtool sign /f "${{ env.WINDOWS_CERT_PATH }}" /p "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 $executablePath
+
+      - name: Upload MSI to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/msi/屏幕取色器_1.0.0_x64_en-US.msi
+          asset_name: ScreenColorPicker-${{ needs.create-release.outputs.tag_name }}-x64.msi
+          asset_content_type: application/octet-stream
+
+      - name: Upload NSIS to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/nsis/屏幕取色器_1.0.0_x64-setup.exe
+          asset_name: ScreenColorPicker-${{ needs.create-release.outputs.tag_name }}-x64-setup.exe
+          asset_content_type: application/octet-stream
+
+  build-macos:
+    name: Build (macOS)
+    needs: create-release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin, aarch64-apple-darwin
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Import Apple Developer Certificate
+        if: secrets.APPLE_CERTIFICATE != ''
+        run: |
+          echo "Importing Apple Developer Certificate..."
+          
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 12)
+          
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          echo "${{ secrets.APPLE_CERTIFICATE }}" | base64 -D -o certificate.p12
+          
+          security import certificate.p12 -P "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security find-identity -v
+          
+          rm -f certificate.p12
+
+      - name: Build Tauri App (Intel x86_64)
+        run: |
+          echo "Building for x86_64..."
+          npm run tauri build -- --target x86_64-apple-darwin
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build Tauri App (Apple Silicon aarch64)
+        run: |
+          echo "Building for aarch64..."
+          npm run tauri build -- --target aarch64-apple-darwin
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Create Universal Binary
+        run: |
+          echo "Creating universal binary..."
+          lipo -create \
+            src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/屏幕取色器_1.0.0_x64.dmg \
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/屏幕取色器_1.0.0_aarch64.dmg \
+            -output ScreenColorPicker-universal.dmg || true
+
+      - name: Upload x86_64 DMG to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/屏幕取色器_1.0.0_x64.dmg
+          asset_name: ScreenColorPicker-${{ needs.create-release.outputs.tag_name }}-x64.dmg
+          asset_content_type: application/octet-stream
+
+      - name: Upload aarch64 DMG to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/屏幕取色器_1.0.0_aarch64.dmg
+          asset_name: ScreenColorPicker-${{ needs.create-release.outputs.tag_name }}-aarch64.dmg
+          asset_content_type: application/octet-stream
+
+  build-linux:
+    name: Build (Linux)
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.0-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Tauri App
+        run: npm run tauri build
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Upload AppImage to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/appimage/屏幕取色器_1.0.0_amd64.AppImage
+          asset_name: ScreenColorPicker-${{ needs.create-release.outputs.tag_name }}-x86_64.AppImage
+          asset_content_type: application/octet-stream
+
+      - name: Upload DEB to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: src-tauri/target/release/bundle/deb/屏幕取色器_1.0.0_amd64.deb
+          asset_name: ScreenColorPicker-${{ needs.create-release.outputs.tag_name }}-amd64.deb
+          asset_content_type: application/octet-stream

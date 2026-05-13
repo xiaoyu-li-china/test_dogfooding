@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 聊天室</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <h1>WebSocket 聊天室</h1>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">未连接</span>
+            </div>
+        </header>
+
+        <div class="messages-container" id="messagesContainer">
+            <div class="system-message">
+                <span>欢迎来到聊天室！正在连接服务器...</span>
+            </div>
+            <div class="typing-indicator" id="typingIndicator">
+                <span class="typing-username"></span>
+                <span class="typing-dots">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </span>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="messageInput" 
+                placeholder="输入消息..." 
+                autocomplete="off"
+                disabled
+            >
+            <button id="sendButton" disabled>发送</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

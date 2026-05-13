@@ -1,0 +1,151 @@
+{
+  "name": "electron-notes",
+  "version": "1.0.0",
+  "description": "基于 Electron + Vue 的桌面便签应用",
+  "main": "main.js",
+  "author": "Your Name <your@email.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:win-portable": "electron-builder --win portable",
+    "build:win-all": "electron-builder --win nsis portable",
+    "build:mac": "electron-builder --mac",
+    "build:mac-dmg": "electron-builder --mac dmg",
+    "build:all": "electron-builder -mw",
+    "publish": "electron-builder --publish always",
+    "publish:win": "electron-builder --win --publish always",
+    "publish:mac": "electron-builder --mac --publish always"
+  },
+  "keywords": [
+    "electron",
+    "vue",
+    "notes",
+    "sticky-notes"
+  ],
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "vue": "^3.4.0",
+    "electron-updater": "^6.1.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/electron-notes.git"
+  },
+  "build": {
+    "appId": "com.electron.notes",
+    "productName": "便签应用",
+    "copyright": "Copyright © 2024 ${author}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "store.js",
+      "renderer/**/*",
+      "node_modules/vue/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "publish": {
+      "provider": "github",
+      "owner": "your-username",
+      "repo": "electron-notes",
+      "vPrefixedTagName": true,
+      "private": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "便签应用"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}",
+      "splashImage": "build/splash.bmp",
+      "requestExecutionLevel": "asInvoker"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-${version}-setup-${arch}.${ext}",
+      "verifyUpdateCodeSignature": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "icon": "build/icon.icns",
+      "background": "build/dmg-background.tiff"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "icon": "build/icon.png"
+    }
+  }
+}
