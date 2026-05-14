@@ -1,0 +1,14 @@
+/Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/TC16-cloc/target/release/deps/serde-64f329697f654abb.d: /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/TC16-cloc/target/release/build/serde-f474d4e75769aa60/out/private.rs
+
+/Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/TC16-cloc/target/release/deps/libserde-64f329697f654abb.rlib: /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/TC16-cloc/target/release/build/serde-f474d4e75769aa60/out/private.rs
+
+/Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/TC16-cloc/target/release/deps/libserde-64f329697f654abb.rmeta: /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/TC16-cloc/target/release/build/serde-f474d4e75769aa60/out/private.rs
+
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/TC16-cloc/target/release/build/serde-f474d4e75769aa60/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/TC16-cloc/target/release/build/serde-f474d4e75769aa60/out

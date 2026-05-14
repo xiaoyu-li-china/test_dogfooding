@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Component 导航栏演示</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+
+        .main-content {
+            margin-top: 80px;
+            padding: 20px;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .page-section {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .page-section h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .page-section p {
+            color: #666;
+            line-height: 1.8;
+        }
+
+        .demo-controls {
+            background-color: #e8f4f8;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .demo-controls h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .demo-controls button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .demo-controls button:hover {
+            background-color: #2980b9;
+        }
+
+        .event-log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .event-log p {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: white;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <custom-nav id="mainNav"></custom-nav>
+
+    <main class="main-content">
+        <div class="demo-controls">
+            <h3>组件控制演示</h3>
+            <button onclick="setActive('home')">设置"首页"为激活</button>
+            <button onclick="setActive('about')">设置"关于"为激活</button>
+            <button onclick="setActive('services')">设置"服务"为激活</button>
+            <button onclick="setActive('contact')">设置"联系"为激活</button>
+            <button onclick="changeLogo()">修改 Logo 文本</button>
+            <button onclick="clearLog()">清空事件日志</button>
+            
+            <h4 style="margin-top: 20px; margin-bottom: 10px;">事件日志:</h4>
+            <div class="event-log" id="eventLog">
+                <p>等待事件...</p>
+            </div>
+        </div>
+
+        <section id="home" class="page-section">
+            <h1>首页</h1>
+            <p>欢迎来到我们的网站！这是使用 Web Component 构建的响应式导航栏演示。</p>
+            <p>Web Component 特性：</p>
+            <ul>
+                <li>使用 Shadow DOM 实现样式隔离</li>
+                <li>支持通过属性动态配置菜单项</li>
+                <li>自定义事件派发通知外部交互</li>
+                <li>桌面端 hover 显示下拉菜单</li>
+                <li>移动端点击父级展开子菜单</li>
+                <li>完整的键盘导航支持</li>
+            </ul>
+        </section>
+
+        <section id="about" class="page-section">
+            <h1>关于我们</h1>
+            <p>我们是一家专业的技术公司，致力于为客户提供优质的解决方案。拥有多年行业经验，我们的团队由一群充满激情和创造力的专业人士组成。</p>
+        </section>
+
+        <section id="services" class="page-section">
+            <h1>我们的服务</h1>
+            <p>我们提供全方位的服务，包括网站开发、移动应用开发、UI/UX 设计、云服务咨询等。无论您的项目规模大小，我们都能为您量身定制最适合的解决方案。</p>
+        </section>
+
+        <section id="contact" class="page-section">
+            <h1>联系我们</h1>
+            <p>如有任何问题或合作意向，欢迎随时与我们联系。您可以通过电子邮件、电话或社交媒体与我们取得联系，我们的团队会在 24 小时内回复您。</p>
+        </section>
+    </main>
+
+    <script src="custom-nav.js"></script>
+    <script>
+        const navItems = [
+            { id: 'home', label: '首页' },
+            { id: 'about', label: '关于' },
+            { 
+                id: 'services', 
+                label: '服务',
+                children: [
+                    { id: 'web-dev', label: '网站开发' },
+                    { id: 'app-dev', label: '应用开发' }
+                ]
+            },
+            { id: 'contact', label: '联系' }
+        ];
+
+        const mainNav = document.getElementById('mainNav');
+        mainNav.setAttribute('items', JSON.stringify(navItems));
+        mainNav.setAttribute('active', 'home');
+        mainNav.setAttribute('logo', 'My App');
+
+        function logEvent(message) {
+            const eventLog = document.getElementById('eventLog');
+            const p = document.createElement('p');
+            const time = new Date().toLocaleTimeString();
+            p.textContent = `[${time}] ${message}`;
+            if (eventLog.firstChild.textContent === '等待事件...') {
+                eventLog.innerHTML = '';
+            }
+            eventLog.insertBefore(p, eventLog.firstChild);
+        }
+
+        mainNav.addEventListener('nav-click', (e) => {
+            logEvent(`导航点击: item=${e.detail.item}, isDropdown=${e.detail.isDropdown}, parentItem=${e.detail.parentItem}`);
+        });
+
+        mainNav.addEventListener('menu-toggle', (e) => {
+            logEvent(`菜单${e.detail.isOpen ? '打开' : '关闭'}`);
+        });
+
+        function setActive(itemId) {
+            mainNav.setAttribute('active', itemId);
+            logEvent(`通过 API 设置激活项: ${itemId}`);
+        }
+
+        let logoIndex = 0;
+        const logos = ['My App', 'Awesome Site', 'Tech Hub', 'Demo App'];
+        function changeLogo() {
+            logoIndex = (logoIndex + 1) % logos.length;
+            mainNav.setAttribute('logo', logos[logoIndex]);
+            logEvent(`通过 API 修改 Logo: ${logos[logoIndex]}`);
+        }
+
+        function clearLog() {
+            const eventLog = document.getElementById('eventLog');
+            eventLog.innerHTML = '<p>等待事件...</p>';
+        }
+
+        logEvent('Web Component 已初始化');
+    </script>
+</body>
+</html>

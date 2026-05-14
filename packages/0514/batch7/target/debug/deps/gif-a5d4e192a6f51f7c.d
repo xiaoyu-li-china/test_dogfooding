@@ -1,0 +1,12 @@
+/Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/0514/batch7/target/debug/deps/gif-a5d4e192a6f51f7c.d: /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/lib.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/common.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/encoder.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/mod.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/converter.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/decoder.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/traits.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/../README.md
+
+/Users/lxy/Documents/wkspsTreacn/test_dogfooding/packages/0514/batch7/target/debug/deps/libgif-a5d4e192a6f51f7c.rmeta: /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/lib.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/common.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/encoder.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/mod.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/converter.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/decoder.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/traits.rs /Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/../README.md
+
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/lib.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/common.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/encoder.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/mod.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/converter.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/reader/decoder.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/traits.rs:
+/Users/lxy/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gif-0.14.2/src/../README.md:

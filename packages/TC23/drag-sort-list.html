@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拖拽排序列表</title>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .add-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .add-section input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .add-section input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .add-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .add-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .add-btn:active {
+            transform: translateY(0);
+        }
+
+        .list-container {
+            list-style: none;
+            min-height: 50px;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: grab;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .list-item:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .list-item:active {
+            cursor: grabbing;
+        }
+
+        .list-item.sortable-ghost {
+            opacity: 0.5;
+            background: #667eea;
+        }
+
+        .list-item.sortable-chosen {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .drag-handle {
+            margin-right: 12px;
+            color: #999;
+            font-size: 18px;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .item-content {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .delete-btn {
+            padding: 6px 12px;
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .delete-btn:hover {
+            background: #ff3838;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .data-display {
+            margin-top: 20px;
+            padding: 16px;
+            background: #1e1e1e;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            color: #d4d4d4;
+            overflow-x: auto;
+        }
+
+        .data-display pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .data-label {
+            color: #569cd6;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 拖拽排序列表</h1>
+        
+        <div class="add-section">
+            <input type="text" id="newItemInput" placeholder="输入新列表项内容...">
+            <button class="add-btn" id="addBtn">添加</button>
+        </div>
+
+        <ul class="list-container" id="sortableList"></ul>
+
+        <div class="data-display">
+            <div class="data-label">当前数据：</div>
+            <pre id="dataOutput"></pre>
+        </div>
+    </div>
+
+    <script>
+        let items = [
+            '学习 JavaScript',
+            '掌握 SortableJS',
+            '完成项目开发',
+            '代码审查',
+            '部署上线'
+        ];
+
+        const listContainer = document.getElementById('sortableList');
+        const newItemInput = document.getElementById('newItemInput');
+        const addBtn = document.getElementById('addBtn');
+        const dataOutput = document.getElementById('dataOutput');
+
+        function renderList() {
+            listContainer.innerHTML = '';
+            
+            if (items.length === 0) {
+                listContainer.innerHTML = '<li class="empty-state">列表为空，添加新项开始吧！</li>';
+                updateDataDisplay();
+                return;
+            }
+
+            items.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'list-item';
+                li.dataset.index = index;
+                li.innerHTML = `
+                    <span class="drag-handle">⋮⋮</span>
+                    <span class="item-content">${escapeHtml(item)}</span>
+                    <button class="delete-btn" data-index="${index}">删除</button>
+                `;
+                listContainer.appendChild(li);
+            });
+
+            updateDataDisplay();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateDataDisplay() {
+            dataOutput.textContent = JSON.stringify(items, null, 2);
+            console.log('当前数据:', items);
+        }
+
+        function addItem() {
+            const content = newItemInput.value.trim();
+            if (content) {
+                items.push(content);
+                newItemInput.value = '';
+                renderList();
+            }
+        }
+
+        function deleteItem(index) {
+            items.splice(index, 1);
+            renderList();
+        }
+
+        addBtn.addEventListener('click', addItem);
+
+        newItemInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addItem();
+            }
+        });
+
+        listContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                const index = parseInt(e.target.dataset.index);
+                deleteItem(index);
+            }
+        });
+
+        function preventDefault(e) {
+            e.preventDefault();
+        }
+
+        Sortable.create(listContainer, {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            preventOnFilter: false,
+            touchStartThreshold: 10,
+            delay: 0,
+            delayOnTouchOnly: 0,
+            onStart: function () {
+                document.body.style.overflow = 'hidden';
+                document.addEventListener('touchmove', preventDefault, { passive: false });
+            },
+            onEnd: function (evt) {
+                document.body.style.overflow = '';
+                document.removeEventListener('touchmove', preventDefault);
+                const item = items.splice(evt.oldIndex, 1)[0];
+                items.splice(evt.newIndex, 0, item);
+                renderList();
+            }
+        });
+
+        renderList();
+    </script>
+</body>
+</html>

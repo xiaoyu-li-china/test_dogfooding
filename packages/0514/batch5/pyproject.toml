@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "csv-analyze-cli"
+version = "0.1.0"
+authors = [
+  { name="Your Name", email="your.email@example.com" }
+]
+description = "A powerful CSV analysis CLI tool with filtering and group-by support"
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Topic :: Utilities",
+]
+dependencies = [
+  "pandas>=2.0.0",
+]
+
+[project.scripts]
+csv-analyze = "csv_analyze:main"
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/csv-analyze-cli"
+"Bug Tracker" = "https://github.com/yourusername/csv-analyze-cli/issues"

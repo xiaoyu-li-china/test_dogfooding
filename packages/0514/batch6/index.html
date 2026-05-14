@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js 3D 粒子系统</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, particles, geometry, material;
+        let particleCount = 5000;
+        let positions, originalPositions, velocities, colors;
+        let angle = 0;
+        let animationId;
+        let mouse = new THREE.Vector2(9999, 9999);
+        let raycaster = new THREE.Raycaster();
+        let mousePlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        let mouseWorldPos = new THREE.Vector3();
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            positions = new Float32Array(particleCount * 3);
+            originalPositions = new Float32Array(particleCount * 3);
+            velocities = new Float32Array(particleCount * 3);
+            colors = new Float32Array(particleCount * 3);
+
+            geometry = new THREE.BufferGeometry();
+
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                const x = (Math.random() - 0.5) * 20;
+                const y = (Math.random() - 0.5) * 20;
+                const z = (Math.random() - 0.5) * 20;
+
+                positions[i3] = x;
+                positions[i3 + 1] = y;
+                positions[i3 + 2] = z;
+
+                originalPositions[i3] = x;
+                originalPositions[i3 + 1] = y;
+                originalPositions[i3 + 2] = z;
+
+                velocities[i3] = 0;
+                velocities[i3 + 1] = 0;
+                velocities[i3 + 2] = 0;
+
+                const hue = (Math.atan2(z, x) + Math.PI) / (2 * Math.PI);
+                const saturation = 0.8;
+                const value = 0.5 + Math.random() * 0.5;
+
+                const color = new THREE.Color();
+                color.setHSL(hue, saturation, value);
+
+                colors[i3] = color.r;
+                colors[i3 + 1] = color.g;
+                colors[i3 + 2] = color.b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            material = new THREE.PointsMaterial({
+                size: 0.1,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+
+            camera.position.z = 30;
+
+            renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
+            renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored, false);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('mouseleave', onMouseLeave);
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(mousePlane, mouseWorldPos);
+        }
+
+        function onMouseLeave() {
+            mouse.set(9999, 9999);
+        }
+
+        function updateParticles() {
+            const positionAttribute = geometry.getAttribute('position');
+            const posArray = positionAttribute.array;
+            const repulsionRadius = 8;
+            const repulsionStrength = 0.5;
+            const springStrength = 0.05;
+            const damping = 0.9;
+
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+
+                const px = posArray[i3];
+                const py = posArray[i3 + 1];
+                const pz = posArray[i3 + 2];
+
+                const dx = px - mouseWorldPos.x;
+                const dy = py - mouseWorldPos.y;
+                const dz = pz - mouseWorldPos.z;
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                if (distance < repulsionRadius && distance > 0.01) {
+                    const force = (1 - distance / repulsionRadius) * repulsionStrength;
+                    velocities[i3] += (dx / distance) * force;
+                    velocities[i3 + 1] += (dy / distance) * force;
+                    velocities[i3 + 2] += (dz / distance) * force;
+                }
+
+                velocities[i3] += (originalPositions[i3] - px) * springStrength;
+                velocities[i3 + 1] += (originalPositions[i3 + 1] - py) * springStrength;
+                velocities[i3 + 2] += (originalPositions[i3 + 2] - pz) * springStrength;
+
+                velocities[i3] *= damping;
+                velocities[i3 + 1] *= damping;
+                velocities[i3 + 2] *= damping;
+
+                posArray[i3] += velocities[i3];
+                posArray[i3 + 1] += velocities[i3 + 1];
+                posArray[i3 + 2] += velocities[i3 + 2];
+            }
+
+            positionAttribute.needsUpdate = true;
+        }
+
+        function handleContextLost(event) {
+            event.preventDefault();
+            cancelAnimationFrame(animationId);
+        }
+
+        function handleContextRestored() {
+            init();
+            animate();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+
+            angle += 0.002;
+            camera.position.x = Math.cos(angle) * 30;
+            camera.position.z = Math.sin(angle) * 30;
+            camera.lookAt(scene.position);
+
+            mousePlane.setFromNormalAndCoplanarPoint(
+                new THREE.Vector3(0, 0, 1),
+                new THREE.Vector3(0, 0, 0)
+            );
+
+            updateParticles();
+
+            particles.rotation.y += 0.001;
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+        animate();
+
+        window.addEventListener('resize', onWindowResize);
+    </script>
+</body>
+</html>

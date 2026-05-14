@@ -1,0 +1,16 @@
+{
+  "name": "phaser-runner-game",
+  "version": "1.0.0",
+  "description": "A side-scrolling runner game using Phaser 3",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "keywords": ["phaser", "game", "runner"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "phaser": "^3.80.1"
+  }
+}

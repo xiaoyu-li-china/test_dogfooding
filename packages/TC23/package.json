@@ -1,0 +1,17 @@
+{
+  "name": "drag-sort-list",
+  "version": "1.0.0",
+  "scripts": {
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run"
+  },
+  "devDependencies": {
+    "cypress": "^13.17.0"
+  },
+  "description": "",
+  "main": "cypress.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

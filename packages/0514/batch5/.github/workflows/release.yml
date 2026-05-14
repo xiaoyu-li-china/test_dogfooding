@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas pytest
+      
+      - name: Run tests
+        run: pytest test_csv_analyze.py -v
+
+  pypi-publish:
+    name: Publish to PyPI
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/csv-analyze-cli
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      
+      - name: Build package
+        run: python -m build
+      
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  build-executables:
+    name: Build Executables
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas pyinstaller
+      
+      - name: Build executable
+        run: pyinstaller --onefile --name csv-analyze csv_analyze.py
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: csv-analyze-${{ matrix.os }}
+          path: dist/
+
+  create-release:
+    name: Create GitHub Release
+    needs: [pypi-publish, build-executables]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            csv-analyze-ubuntu-latest/*
+            csv-analyze-windows-latest/*
+            csv-analyze-macos-latest/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日志查看器 - Log Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1::before {
+            content: "📊";
+            font-size: 32px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 40px;
+        }
+
+        .controls {
+            background: #313244;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-group label {
+            font-size: 13px;
+            color: #a6adc8;
+            font-weight: 500;
+        }
+
+        .control-group select,
+        .control-group input {
+            padding: 10px 16px;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            font-size: 14px;
+            min-width: 150px;
+            transition: all 0.3s ease;
+        }
+
+        .control-group select:focus,
+        .control-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 22px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-refresh {
+            background: #40a02b;
+            color: white;
+        }
+
+        .btn-refresh:hover {
+            background: #48a832;
+            transform: translateY(-2px);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #313244;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .stat-card.error {
+            border-top: 4px solid #f38ba8;
+        }
+
+        .stat-card.warn {
+            border-top: 4px solid #f9e2af;
+        }
+
+        .stat-card.info {
+            border-top: 4px solid #89b4fa;
+        }
+
+        .stat-card.debug {
+            border-top: 4px solid #a6e3a1;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-card.error .stat-value { color: #f38ba8; }
+        .stat-card.warn .stat-value { color: #f9e2af; }
+        .stat-card.info .stat-value { color: #89b4fa; }
+        .stat-card.debug .stat-value { color: #a6e3a1; }
+
+        .stat-label {
+            font-size: 14px;
+            color: #a6adc8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .logs-container {
+            background: #313244;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .logs-header {
+            background: #45475a;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #585b70;
+        }
+
+        .logs-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #cdd6f4;
+        }
+
+        .log-count {
+            background: #667eea;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .log-item {
+            padding: 16px 24px;
+            border-bottom: 1px solid #45475a;
+            transition: background 0.2s ease;
+        }
+
+        .log-item:hover {
+            background: #3b3c51;
+        }
+
+        .log-item:last-child {
+            border-bottom: none;
+        }
+
+        .log-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .log-level {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .log-level.error {
+            background: #f38ba8;
+            color: #1e1e2e;
+        }
+
+        .log-level.warn {
+            background: #f9e2af;
+            color: #1e1e2e;
+        }
+
+        .log-level.info {
+            background: #89b4fa;
+            color: #1e1e2e;
+        }
+
+        .log-level.debug {
+            background: #a6e3a1;
+            color: #1e1e2e;
+        }
+
+        .log-timestamp {
+            font-size: 13px;
+            color: #a6adc8;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .log-message {
+            font-size: 15px;
+            color: #cdd6f4;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .log-metadata {
+            background: #1e1e2e;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
+            color: #a6adc8;
+            overflow-x: auto;
+        }
+
+        .log-metadata pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a6adc8;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #45475a;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>日志查看器 Log Viewer</h1>
+    </div>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card error">
+                <div class="stat-value" id="errorCount">0</div>
+                <div class="stat-label">错误 ERROR</div>
+            </div>
+            <div class="stat-card warn">
+                <div class="stat-value" id="warnCount">0</div>
+                <div class="stat-label">警告 WARN</div>
+            </div>
+            <div class="stat-card info">
+                <div class="stat-value" id="infoCount">0</div>
+                <div class="stat-label">信息 INFO</div>
+            </div>
+            <div class="stat-card debug">
+                <div class="stat-value" id="debugCount">0</div>
+                <div class="stat-label">调试 DEBUG</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>日志级别 Level</label>
+                <select id="levelFilter">
+                    <option value="">全部 All</option>
+                    <option value="error">Error</option>
+                    <option value="warn">Warn</option>
+                    <option value="info">Info</option>
+                    <option value="debug">Debug</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>时间范围 Time Range</label>
+                <select id="timeRange">
+                    <option value="15m">最近 15 分钟</option>
+                    <option value="1h" selected>最近 1 小时</option>
+                    <option value="6h">最近 6 小时</option>
+                    <option value="24h">最近 24 小时</option>
+                    <option value="7d">最近 7 天</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="fetchLogs()">🔍 查询 Search</button>
+            <button class="btn btn-refresh" onclick="fetchLogs()">🔄 刷新 Refresh</button>
+        </div>
+
+        <div class="logs-container">
+            <div class="logs-header">
+                <h2>日志列表 Logs</h2>
+                <span class="log-count" id="logCount">0 条</span>
+            </div>
+            <div id="logsList">
+                <div class="loading show">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchLogs() {
+            const level = document.getElementById('levelFilter').value;
+            const timeRange = document.getElementById('timeRange').value;
+            
+            const loading = document.querySelector('.loading');
+            const logsList = document.getElementById('logsList');
+            
+            loading.classList.add('show');
+            logsList.innerHTML = '<div class="loading show"><div class="spinner"></div></div>';
+
+            try {
+                let url = '/logs/search?time_range=' + timeRange;
+                if (level) {
+                    url += '&level=' + level;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStats(data.logs);
+                    renderLogs(data.logs);
+                }
+            } catch (error) {
+                console.error('Failed to fetch logs:', error);
+                logsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">❌</div>
+                        <p>加载失败，请确保服务正常运行</p>
+                        <p>Failed to load logs, please ensure service is running</p>
+                    </div>
+                `;
+            } finally {
+                loading.classList.remove('show');
+            }
+        }
+
+        function updateStats(logs) {
+            const counts = { error: 0, warn: 0, info: 0, debug: 0 };
+            logs.forEach(log => {
+                if (counts.hasOwnProperty(log.level)) {
+                    counts[log.level]++;
+                }
+            });
+            
+            document.getElementById('errorCount').textContent = counts.error;
+            document.getElementById('warnCount').textContent = counts.warn;
+            document.getElementById('infoCount').textContent = counts.info;
+            document.getElementById('debugCount').textContent = counts.debug;
+        }
+
+        function renderLogs(logs) {
+            const logsList = document.getElementById('logsList');
+            document.getElementById('logCount').textContent = logs.length + ' 条';
+
+            if (logs.length === 0) {
+                logsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>暂无日志记录</p>
+                        <p>No logs found</p>
+                    </div>
+                `;
+                return;
+            }
+
+            logsList.innerHTML = logs.map(log => `
+                <div class="log-item">
+                    <div class="log-header">
+                        <span class="log-level ${log.level}">${log.level}</span>
+                        <span class="log-timestamp">${formatTimestamp(log.timestamp)}</span>
+                    </div>
+                    <div class="log-message">${escapeHtml(log.message)}</div>
+                    ${log.metadata && Object.keys(log.metadata).length > 0 ? `
+                        <div class="log-metadata">
+                            <pre>${escapeHtml(JSON.stringify(log.metadata, null, 2))}</pre>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function formatTimestamp(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        fetchLogs();
+        setInterval(fetchLogs, 10000);
+    </script>
+</body>
+</html>
