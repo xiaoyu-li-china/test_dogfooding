@@ -1,0 +1,4 @@
+requests>=2.31.0
+flask>=2.3.0
+prometheus-client>=0.17.0
+gunicorn>=21.0.0

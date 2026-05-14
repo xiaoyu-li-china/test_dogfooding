@@ -18,7 +18,7 @@ export const QuestionItem: React.FC<QuestionItemProps> = ({ question }) => {
           {({ field }: FieldProps) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {question.options.map((option) => (
-                <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <label key={`${question.id}_${option}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
                     type="radio"
                     {...field}
@@ -39,7 +39,7 @@ export const QuestionItem: React.FC<QuestionItemProps> = ({ question }) => {
           {({ field }: FieldProps<string[]>) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {question.options.map((option) => (
-                <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <label key={`${question.id}_${option}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     {...field}

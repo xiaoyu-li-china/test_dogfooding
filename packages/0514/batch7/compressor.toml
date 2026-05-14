@@ -1,0 +1,11 @@
+[formats.webp]
+quality = 85
+output_extension = "webp"
+
+[formats.avif]
+quality = 65
+output_extension = "avif"
+
+[formats.gzip]
+quality = 9
+output_extension = "gz"

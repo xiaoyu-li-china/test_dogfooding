@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-05-14T14:11:51Z",
+  "total_checks": 1,
+  "successful_checks": 1,
+  "failed_checks": 0,
+  "alerts_sent": [],
+  "results": [
+    {
+      "url": "https://example.com",
+      "success": true,
+      "status_code": 200,
+      "response_time": 2165.77,
+      "errors": [],
+      "consecutive_failures": 0,
+      "alert_sent": false
+    }
+  ]
+}

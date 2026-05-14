@@ -1,109 +1,199 @@
 #!/usr/bin/env python3
-import argparse
-import json
-import ssl
 import sys
+import json
 import time
-from dataclasses import dataclass, asdict
-from typing import List, Optional
-import urllib.request
-import urllib.error
+import argparse
+import requests
+import os
+from typing import List, Dict, Any
 
 
-@dataclass
-class CheckResult:
-    url: str
-    success: bool
-    status_code: Optional[int]
-    response_time: float
-    error: Optional[str]
-    keyword_found: Optional[bool]
+FAILURE_COUNT_FILE = "failure_counts.json"
+ALERT_THRESHOLD = 3
 
 
-def create_ssl_context():
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    return context
+def load_failure_counts() -> Dict[str, Dict[str, Any]]:
+    if os.path.exists(FAILURE_COUNT_FILE):
+        try:
+            with open(FAILURE_COUNT_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+    return {}
 
 
-def check_url(url: str, keyword: Optional[str] = None, timeout: int = 10) -> CheckResult:
-    start_time = time.time()
-    result = CheckResult(
-        url=url,
-        success=False,
-        status_code=None,
-        response_time=0.0,
-        error=None,
-        keyword_found=None
-    )
+def save_failure_counts(counts: Dict[str, Dict[str, Any]]) -> None:
+    with open(FAILURE_COUNT_FILE, "w", encoding="utf-8") as f:
+        json.dump(counts, f, indent=2, ensure_ascii=False)
+
+
+def update_failure_count(url: str, success: bool) -> Dict[str, Any]:
+    counts = load_failure_counts()
     
-    ssl_context = create_ssl_context()
+    if url not in counts:
+        counts[url] = {"consecutive_failures": 0, "last_alert_time": 0, "last_status": None}
+    
+    if success:
+        counts[url]["consecutive_failures"] = 0
+        counts[url]["last_status"] = "success"
+    else:
+        counts[url]["consecutive_failures"] += 1
+        counts[url]["last_status"] = "failed"
+    
+    save_failure_counts(counts)
+    return counts[url]
+
+
+def should_send_alert(url_stats: Dict[str, Any]) -> bool:
+    consecutive = url_stats["consecutive_failures"]
+    last_alert = url_stats["last_alert_time"]
+    current_time = time.time()
+    
+    if consecutive >= ALERT_THRESHOLD:
+        if current_time - last_alert > 3600:
+            return True
+    return False
+
+
+def update_alert_time(url: str) -> None:
+    counts = load_failure_counts()
+    if url in counts:
+        counts[url]["last_alert_time"] = time.time()
+        save_failure_counts(counts)
+
+
+def send_dingtalk_alert(webhook: str, url: str, errors: List[str], consecutive: int) -> bool:
+    message = {
+        "msgtype": "markdown",
+        "markdown": {
+            "title": "服务告警",
+            "text": f"### ⚠️ HTTP 服务告警\n\n**URL**: {url}\n\n**连续失败次数**: {consecutive}\n\n**错误信息**:\n" + 
+                    "\n".join([f"- {err}" for err in errors]) + 
+                    f"\n\n**告警时间**: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}"
+        }
+    }
     
     try:
-        with urllib.request.urlopen(url, timeout=timeout, context=ssl_context) as response:
-            elapsed = time.time() - start_time
-            result.status_code = response.getcode()
-            result.response_time = round(elapsed, 3)
-            
-            content = response.read().decode('utf-8', errors='ignore')
-            
-            if keyword:
-                result.keyword_found = keyword in content
-                result.success = result.keyword_found
-            else:
-                result.success = 200 <= result.status_code < 300
-                
-    except urllib.error.HTTPError as e:
+        response = requests.post(webhook, json=message, timeout=10)
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
+
+
+def send_wechat_alert(webhook: str, url: str, errors: List[str], consecutive: int) -> bool:
+    message = {
+        "msgtype": "markdown",
+        "markdown": {
+            "content": f"### ⚠️ HTTP 服务告警\n\n**URL**: <font color=\"warning\">{url}</font>\n\n"
+                       f"**连续失败次数**: <font color=\"comment\">{consecutive}</font>\n\n"
+                       f"**错误信息**:\n" + 
+                       "\n".join([f">- {err}" for err in errors]) + 
+                       f"\n\n**告警时间**: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}"
+        }
+    }
+    
+    try:
+        response = requests.post(webhook, json=message, timeout=10)
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
+
+
+def check_url(url: str, keywords: List[str] = None, timeout: int = 10) -> Dict[str, Any]:
+    result = {
+        "url": url,
+        "success": False,
+        "status_code": None,
+        "response_time": None,
+        "errors": []
+    }
+    
+    start_time = time.time()
+    
+    try:
+        response = requests.get(url, timeout=timeout)
         elapsed = time.time() - start_time
-        result.status_code = e.code
-        result.response_time = round(elapsed, 3)
-        result.error = f"HTTPError: {e.reason}"
-        result.success = False
-    except urllib.error.URLError as e:
+        
+        result["status_code"] = response.status_code
+        result["response_time"] = round(elapsed * 1000, 2)
+        
+        if response.status_code >= 400:
+            result["errors"].append(f"HTTP status code: {response.status_code}")
+        else:
+            result["success"] = True
+        
+        if keywords:
+            for keyword in keywords:
+                if keyword not in response.text:
+                    result["success"] = False
+                    result["errors"].append(f"Keyword not found: '{keyword}'")
+    
+    except requests.exceptions.RequestException as e:
         elapsed = time.time() - start_time
-        result.response_time = round(elapsed, 3)
-        result.error = f"URLError: {str(e.reason)}"
-        result.success = False
-    except Exception as e:
-        elapsed = time.time() - start_time
-        result.response_time = round(elapsed, 3)
-        result.error = f"Exception: {str(e)}"
-        result.success = False
+        result["response_time"] = round(elapsed * 1000, 2)
+        result["errors"].append(f"Request failed: {str(e)}")
     
     return result
 
 
 def main():
-    parser = argparse.ArgumentParser(description='HTTP 服务健康检查工具')
-    parser.add_argument('--urls', nargs='+', required=True, help='要检查的 URL 列表')
-    parser.add_argument('--keyword', help='响应内容中需要包含的关键字')
-    parser.add_argument('--timeout', type=int, default=10, help='超时时间（秒）')
-    parser.add_argument('--output', help='输出 JSON 报告的文件路径')
+    parser = argparse.ArgumentParser(description="HTTP service health check with alerts")
+    parser.add_argument("--urls", nargs="+", required=True, help="URLs to check")
+    parser.add_argument("--keywords", nargs="+", help="Keywords to verify in response")
+    parser.add_argument("--timeout", type=int, default=10, help="Request timeout in seconds")
+    parser.add_argument("--output", help="Output JSON file path")
+    parser.add_argument("--dingtalk-webhook", help="DingTalk webhook URL for alerts")
+    parser.add_argument("--wechat-webhook", help="WeChat Work webhook URL for alerts")
     
     args = parser.parse_args()
     
     results = []
     all_success = True
+    alerts_sent = []
     
     for url in args.urls:
-        result = check_url(url, args.keyword, args.timeout)
+        result = check_url(url, args.keywords, args.timeout)
         results.append(result)
-        if not result.success:
+        
+        if not result["success"]:
             all_success = False
+        
+        url_stats = update_failure_count(url, result["success"])
+        result["consecutive_failures"] = url_stats["consecutive_failures"]
+        
+        if not result["success"] and should_send_alert(url_stats):
+            alert_sent = False
+            
+            if args.dingtalk_webhook:
+                if send_dingtalk_alert(args.dingtalk_webhook, url, result["errors"], url_stats["consecutive_failures"]):
+                    alert_sent = True
+            
+            if args.wechat_webhook:
+                if send_wechat_alert(args.wechat_webhook, url, result["errors"], url_stats["consecutive_failures"]):
+                    alert_sent = True
+            
+            if alert_sent:
+                update_alert_time(url)
+                alerts_sent.append(url)
+                result["alert_sent"] = True
+            else:
+                result["alert_sent"] = False
+        else:
+            result["alert_sent"] = False
     
     report = {
-        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
-        'total_urls': len(results),
-        'success_count': sum(1 for r in results if r.success),
-        'failure_count': sum(1 for r in results if not r.success),
-        'results': [asdict(r) for r in results]
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "total_checks": len(results),
+        "successful_checks": sum(1 for r in results if r["success"]),
+        "failed_checks": sum(1 for r in results if not r["success"]),
+        "alerts_sent": alerts_sent,
+        "results": results
     }
     
-    json_output = json.dumps(report, ensure_ascii=False, indent=2)
+    json_output = json.dumps(report, indent=2, ensure_ascii=False)
     
     if args.output:
-        with open(args.output, 'w', encoding='utf-8') as f:
+        with open(args.output, "w", encoding="utf-8") as f:
             f.write(json_output)
     else:
         print(json_output)
@@ -111,5 +201,5 @@ def main():
     sys.exit(0 if all_success else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

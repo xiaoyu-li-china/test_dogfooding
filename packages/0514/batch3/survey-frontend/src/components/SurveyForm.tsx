@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,6 +24,9 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ survey }) => {
   const [visibleQuestions, setVisibleQuestions] = useState<Question[]>(
     survey.questions.sort((a, b) => a.order - b.order)
   );
+  const containerRef = useRef<HTMLDivElement>(null);
+  const itemHeight = 200; // 每个问题项的估计高度
+  const bufferSize = 3; // 缓冲区大小，额外渲染的项目数
 
   useEffect(() => {
     const checkToken = async () => {
@@ -130,26 +133,42 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ survey }) => {
               <p style={{ color: '#666' }}>{survey.description}</p>
             </div>
 
-            {visibleQuestions.map((question) => (
-              <QuestionItem key={question.id} question={question} />
-            ))}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
+            <div 
+              ref={containerRef}
               style={{
-                padding: '12px 32px',
-                background: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '16px',
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                opacity: isSubmitting ? 0.7 : 1,
+                maxHeight: '600px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px',
+                padding: '16px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
               }}
             >
-              {isSubmitting ? '提交中...' : '提交问卷'}
-            </button>
+              {visibleQuestions.map((question) => (
+                <QuestionItem key={question.id} question={question} />
+              ))}
+            </div>
+
+            <div style={{ marginTop: '24px' }}>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                style={{
+                  padding: '12px 32px',
+                  background: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '16px',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.7 : 1,
+                }}
+              >
+                {isSubmitting ? '提交中...' : '提交问卷'}
+              </button>
+            </div>
           </Form>
         );
       }}

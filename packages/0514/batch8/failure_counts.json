@@ -1,0 +1,12 @@
+{
+  "https://example.com": {
+    "consecutive_failures": 0,
+    "last_alert_time": 0,
+    "last_status": "success"
+  },
+  "https://api.example.com": {
+    "consecutive_failures": 1,
+    "last_alert_time": 0,
+    "last_status": "failed"
+  }
+}

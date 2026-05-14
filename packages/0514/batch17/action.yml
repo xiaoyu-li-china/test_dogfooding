@@ -1,0 +1,50 @@
+name: 'Dependency Update Checker'
+description: 'Check PyPI dependencies for updates and vulnerabilities, and create PRs'
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  requirements-file:
+    description: 'Path to requirements file (requirements.txt, pyproject.toml, or Pipfile)'
+    required: false
+    default: 'requirements.txt'
+  github-token:
+    description: 'GitHub token for creating PRs'
+    required: true
+  create-pr:
+    description: 'Whether to create PRs'
+    required: false
+    default: 'true'
+  base-branch:
+    description: 'Base branch for PR'
+    required: false
+    default: 'main'
+  allow-major:
+    description: 'Allow major version updates'
+    required: false
+    default: 'false'
+  skip-security:
+    description: 'Skip security vulnerability checks'
+    required: false
+    default: 'false'
+
+outputs:
+  report:
+    description: 'Generated update report'
+  pr-url:
+    description: 'URL of created PR (if any)'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - --file
+    - ${{ inputs.requirements-file }}
+    - --base-branch
+    - ${{ inputs.base-branch }}
+    - ${{ inputs.create-pr == 'true' && '--create-pr' || '' }}
+    - ${{ inputs.allow-major == 'true' && '--allow-major' || '' }}
+    - ${{ inputs.skip-security == 'true' && '--no-security' || '' }}
+  env:
+    GITHUB_TOKEN: ${{ inputs.github-token }}

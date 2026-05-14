@@ -1,0 +1,29 @@
+groups:
+  - name: health_check_alerts
+    rules:
+      - alert: ServiceDown
+        expr: health_check_status == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.url }} is down"
+          description: "Service {{ $labels.url }} has been down for more than 1 minute."
+
+      - alert: HighResponseTime
+        expr: health_check_response_time_seconds_sum / health_check_response_time_seconds_count > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time for {{ $labels.url }}"
+          description: "Average response time for {{ $labels.url }} is above 5 seconds."
+
+      - alert: ConsecutiveFailures
+        expr: health_check_consecutive_failures >= 3
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Consecutive failures for {{ $labels.url }}"
+          description: "{{ $labels.url }} has failed {{ $value }} times consecutively."

@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "matrix-core",
+    "matrix-sparse",
+    "matrix-bench",
+]
+resolver = "2"

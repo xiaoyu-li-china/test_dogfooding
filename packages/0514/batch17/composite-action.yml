@@ -1,0 +1,82 @@
+name: 'Dependency Update Checker'
+description: 'Check PyPI dependencies for updates and vulnerabilities, and create PRs'
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  requirements-file:
+    description: 'Path to requirements file (requirements.txt, pyproject.toml, or Pipfile)'
+    required: false
+    default: 'requirements.txt'
+  create-pr:
+    description: 'Whether to create PRs'
+    required: false
+    default: 'true'
+  base-branch:
+    description: 'Base branch for PR'
+    required: false
+    default: 'main'
+  allow-major:
+    description: 'Allow major version updates'
+    required: false
+    default: 'false'
+  skip-security:
+    description: 'Skip security vulnerability checks'
+    required: false
+    default: 'false'
+
+outputs:
+  report:
+    description: 'Generated update report'
+  pr-url:
+    description: 'URL of created PR (if any)'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install packaging requests tomli
+    
+    - name: Run dependency checker
+      id: checker
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        ARGS="--file ${{ inputs.requirements-file }} --base-branch ${{ inputs.base-branch }} --report update_report.md"
+        
+        if [ "${{ inputs.create-pr }}" = "true" ]; then
+          ARGS="$ARGS --create-pr"
+        fi
+        
+        if [ "${{ inputs.allow-major }}" = "true" ]; then
+          ARGS="$ARGS --allow-major"
+        fi
+        
+        if [ "${{ inputs.skip-security }}" = "true" ]; then
+          ARGS="$ARGS --no-security"
+        fi
+        
+        python ${{ github.action_path }}/dep_updater.py $ARGS
+        
+        REPORT_CONTENT=$(cat update_report.md)
+        echo "report<<EOF" >> $GITHUB_OUTPUT
+        echo "$REPORT_CONTENT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Upload report artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-report
+        path: update_report.md

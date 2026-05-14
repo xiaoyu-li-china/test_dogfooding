@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vega-Lite 交互式仪表板</title>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+            transition: background-color 0.3s;
+        }
+        body.dark-mode {
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        body.dark-mode h1 {
+            color: #fff;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+        body.dark-mode .chart-container {
+            background: #2d2d2d;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .btn.secondary {
+            background-color: #2196F3;
+        }
+        .btn.secondary:hover {
+            background-color: #1976D2;
+        }
+        #vis-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Vega-Lite 交互式仪表板</h1>
+    <div class="dashboard">
+        <div class="controls">
+            <button class="btn" id="resetBtn">重置筛选</button>
+            <button class="btn secondary" id="exportBtn">导出 CSV</button>
+            <button class="btn secondary" id="themeBtn">切换主题</button>
+        </div>
+        <div class="chart-container">
+            <div id="vis-container"></div>
+        </div>
+    </div>
+
+    <script>
+        let view;
+        let currentData;
+        let isDarkMode = false;
+
+        const darkTheme = {
+            background: '#2d2d2d',
+            title: { color: '#fff' },
+            axis: {
+                domainColor: '#666',
+                gridColor: '#444',
+                tickColor: '#666',
+                labelColor: '#fff',
+                titleColor: '#fff'
+            },
+            legend: {
+                labelColor: '#fff',
+                titleColor: '#fff'
+            },
+            header: {
+                labelColor: '#fff',
+                titleColor: '#fff'
+            }
+        };
+
+        const lightTheme = {
+            background: '#fff',
+            title: { color: '#333' },
+            axis: {
+                domainColor: '#333',
+                gridColor: '#ddd',
+                tickColor: '#333',
+                labelColor: '#333',
+                titleColor: '#333'
+            },
+            legend: {
+                labelColor: '#333',
+                titleColor: '#333'
+            },
+            header: {
+                labelColor: '#333',
+                titleColor: '#333'
+            }
+        };
+
+        function createSpec(data, containerWidth, theme = 'light') {
+            const chartWidth = Math.min((containerWidth - 60) / 2, 550);
+            const themeConfig = theme === 'dark' ? darkTheme : lightTheme;
+            
+            return {
+                "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+                "config": themeConfig,
+                "data": {"values": data},
+                "params": [
+                    {
+                        "name": "brush",
+                        "select": {"type": "interval", "encodings": ["x", "y"]},
+                        "bind": "scales"
+                    },
+                    {
+                        "name": "categorySelect",
+                        "select": {"type": "point", "fields": ["category"]}
+                    }
+                ],
+                "hconcat": [
+                    {
+                        "title": "散点图 (框选筛选)",
+                        "mark": "point",
+                        "transform": [{
+                            "filter": {"param": "categorySelect"}
+                        }],
+                        "encoding": {
+                            "x": {"field": "x", "type": "quantitative", "title": "X 轴"},
+                            "y": {"field": "y", "type": "quantitative", "title": "Y 轴"},
+                            "color": {
+                                "condition": {
+                                    "param": "brush",
+                                    "field": "category",
+                                    "type": "nominal"
+                                },
+                                "value": theme === 'dark' ? '#666' : 'grey'
+                            },
+                            "size": {"field": "value", "type": "quantitative", "title": "数值大小"},
+                            "opacity": {
+                                "condition": {"param": "categorySelect", "value": 1},
+                                "value": 0.3
+                            }
+                        },
+                        "width": chartWidth,
+                        "height": 400
+                    },
+                    {
+                        "title": "柱状图 (点击筛选)",
+                        "transform": [{
+                            "filter": {"param": "brush"}
+                        }],
+                        "mark": {"type": "bar", "cursor": "pointer"},
+                        "params": [{
+                            "name": "categorySelect",
+                            "select": {"type": "point", "encodings": ["color"]},
+                            "bind": "scales"
+                        }],
+                        "encoding": {
+                            "x": {"field": "category", "type": "nominal", "title": "类别"},
+                            "y": {
+                                "aggregate": "count",
+                                "type": "quantitative",
+                                "title": "数量"
+                            },
+                            "color": {"field": "category", "type": "nominal"},
+                            "opacity": {
+                                "condition": {"param": "categorySelect", "value": 1},
+                                "value": 0.5
+                            }
+                        },
+                        "width": chartWidth,
+                        "height": 400
+                    }
+                ]
+            };
+        }
+
+        async function renderDashboard() {
+            const container = document.querySelector('#vis-container');
+            const containerWidth = container.parentElement.offsetWidth;
+            const theme = isDarkMode ? 'dark' : 'light';
+            const spec = createSpec(currentData, containerWidth, theme);
+            
+            if (view) {
+                await view.finalize();
+            }
+            
+            const result = await vegaEmbed('#vis-container', spec);
+            view = result.view;
+        }
+
+        function exportToCSV() {
+            if (!view) return;
+            
+            let filteredData = [...currentData];
+            const brushValue = view.signal('brush');
+            const categoryValue = view.signal('categorySelect');
+            
+            if (brushValue && Object.keys(brushValue).length > 0) {
+                filteredData = filteredData.filter(d => 
+                    d.x >= brushValue.x[0] && d.x <= brushValue.x[1] &&
+                    d.y >= brushValue.y[0] && d.y <= brushValue.y[1]
+                );
+            }
+            
+            if (categoryValue && categoryValue.category && categoryValue.category.length > 0) {
+                filteredData = filteredData.filter(d => 
+                    categoryValue.category.includes(d.category)
+                );
+            }
+
+            const headers = Object.keys(filteredData[0]).join(',');
+            const rows = filteredData.map(d => 
+                Object.values(d).map(v => typeof v === 'string' ? `"${v}"` : v).join(',')
+            );
+            const csv = [headers, ...rows].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'dashboard_data.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-mode', isDarkMode);
+            renderDashboard();
+        }
+
+        fetch('/api/data')
+            .then(response => response.json())
+            .then(data => {
+                currentData = data;
+                renderDashboard();
+
+                let resizeTimeout;
+                window.addEventListener('resize', () => {
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(renderDashboard, 200);
+                });
+
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    if (view) {
+                        view.signal('brush', {}).signal('categorySelect', {}).run();
+                    }
+                });
+
+                document.getElementById('exportBtn').addEventListener('click', exportToCSV);
+                document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+            })
+            .catch(error => console.error('加载数据失败:', error));
+    </script>
+</body>
+</html>

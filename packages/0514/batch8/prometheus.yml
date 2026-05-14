@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+scrape_configs:
+  - job_name: 'health-check'
+    static_configs:
+      - targets: ['health-check:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s

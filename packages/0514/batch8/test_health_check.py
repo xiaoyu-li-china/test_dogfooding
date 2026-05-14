@@ -1,154 +1,283 @@
 import pytest
 import responses
 import json
-import sys
+import os
 import time
-from unittest.mock import patch, MagicMock
-
-import health_check
-
-
-@responses.activate
-def test_check_url_success():
-    responses.add(responses.GET, 'http://example.com', status=200, body='Hello World')
-    
-    result = health_check.check_url('http://example.com', timeout=5)
-    
-    assert result.success is True
-    assert result.status_code == 200
-    assert result.error is None
-    assert result.response_time > 0
+from health_check import (
+    check_url,
+    load_failure_counts,
+    save_failure_counts,
+    update_failure_count,
+    should_send_alert,
+    send_dingtalk_alert,
+    send_wechat_alert,
+    FAILURE_COUNT_FILE,
+    ALERT_THRESHOLD
+)
 
 
-@responses.activate
-def test_check_url_with_keyword_found():
-    responses.add(responses.GET, 'http://example.com', status=200, body='Hello World')
-    
-    result = health_check.check_url('http://example.com', keyword='Hello', timeout=5)
-    
-    assert result.success is True
-    assert result.keyword_found is True
+@pytest.fixture(autouse=True)
+def cleanup_failure_file():
+    if os.path.exists(FAILURE_COUNT_FILE):
+        os.remove(FAILURE_COUNT_FILE)
+    yield
+    if os.path.exists(FAILURE_COUNT_FILE):
+        os.remove(FAILURE_COUNT_FILE)
 
 
-@responses.activate
-def test_check_url_with_keyword_not_found():
-    responses.add(responses.GET, 'http://example.com', status=200, body='Hello World')
-    
-    result = health_check.check_url('http://example.com', keyword='NotFound', timeout=5)
-    
-    assert result.success is False
-    assert result.keyword_found is False
-
-
-@responses.activate
-def test_check_url_404_error():
-    responses.add(responses.GET, 'http://example.com', status=404)
-    
-    result = health_check.check_url('http://example.com', timeout=5)
-    
-    assert result.success is False
-    assert result.status_code == 404
-    assert 'HTTPError' in result.error
-
-
-@responses.activate
-def test_check_url_500_error():
-    responses.add(responses.GET, 'http://example.com', status=500)
-    
-    result = health_check.check_url('http://example.com', timeout=5)
-    
-    assert result.success is False
-    assert result.status_code == 500
-
-
-def test_check_url_connection_error():
-    with patch('urllib.request.urlopen') as mock_urlopen:
-        mock_urlopen.side_effect = Exception('Connection refused')
+class TestCheckUrl:
+    @responses.activate
+    def test_check_url_success(self):
+        url = "https://example.com"
+        responses.add(responses.GET, url, status=200, body="OK")
         
-        result = health_check.check_url('http://nonexistent.example', timeout=5)
+        result = check_url(url)
         
-        assert result.success is False
-        assert result.status_code is None
-        assert 'Connection refused' in result.error
-
-
-@responses.activate
-def test_main_success(capsys):
-    responses.add(responses.GET, 'http://example.com', status=200, body='OK')
+        assert result["success"] is True
+        assert result["status_code"] == 200
+        assert result["response_time"] > 0
+        assert len(result["errors"]) == 0
     
-    test_args = ['health_check.py', '--urls', 'http://example.com']
-    with patch.object(sys, 'argv', test_args):
-        with pytest.raises(SystemExit) as excinfo:
-            health_check.main()
+    @responses.activate
+    def test_check_url_with_keyword_success(self):
+        url = "https://example.com"
+        responses.add(responses.GET, url, status=200, body="Welcome to Example")
         
-        assert excinfo.value.code == 0
+        result = check_url(url, keywords=["Welcome"])
         
-        captured = capsys.readouterr()
-        report = json.loads(captured.out)
-        assert report['success_count'] == 1
-        assert report['failure_count'] == 0
-
-
-@responses.activate
-def test_main_failure():
-    responses.add(responses.GET, 'http://example.com', status=500)
+        assert result["success"] is True
     
-    test_args = ['health_check.py', '--urls', 'http://example.com']
-    with patch.object(sys, 'argv', test_args):
-        with pytest.raises(SystemExit) as excinfo:
-            health_check.main()
+    @responses.activate
+    def test_check_url_keyword_missing(self):
+        url = "https://example.com"
+        responses.add(responses.GET, url, status=200, body="Hello World")
         
-        assert excinfo.value.code == 1
-
-
-@responses.activate
-def test_main_multiple_urls(capsys):
-    responses.add(responses.GET, 'http://example1.com', status=200, body='OK')
-    responses.add(responses.GET, 'http://example2.com', status=500)
-    responses.add(responses.GET, 'http://example3.com', status=200, body='Hello')
-    
-    test_args = ['health_check.py', '--urls', 'http://example1.com', 'http://example2.com', 'http://example3.com']
-    with patch.object(sys, 'argv', test_args):
-        with pytest.raises(SystemExit) as excinfo:
-            health_check.main()
+        result = check_url(url, keywords=["Welcome"])
         
-        assert excinfo.value.code == 1
+        assert result["success"] is False
+        assert "Keyword not found: 'Welcome'" in result["errors"]
+    
+    @responses.activate
+    def test_check_url_404_error(self):
+        url = "https://example.com/notfound"
+        responses.add(responses.GET, url, status=404)
         
-        captured = capsys.readouterr()
-        report = json.loads(captured.out)
-        assert report['total_urls'] == 3
-        assert report['success_count'] == 2
-        assert report['failure_count'] == 1
-
-
-@responses.activate
-def test_main_output_to_file(tmp_path):
-    responses.add(responses.GET, 'http://example.com', status=200, body='OK')
-    
-    output_file = tmp_path / 'report.json'
-    test_args = ['health_check.py', '--urls', 'http://example.com', '--output', str(output_file)]
-    
-    with patch.object(sys, 'argv', test_args):
-        with pytest.raises(SystemExit):
-            health_check.main()
-    
-    assert output_file.exists()
-    with open(output_file, 'r') as f:
-        report = json.load(f)
-        assert report['success_count'] == 1
-
-
-@responses.activate
-def test_main_with_keyword(capsys):
-    responses.add(responses.GET, 'http://example.com', status=200, body='Welcome to the site')
-    
-    test_args = ['health_check.py', '--urls', 'http://example.com', '--keyword', 'Welcome']
-    with patch.object(sys, 'argv', test_args):
-        with pytest.raises(SystemExit) as excinfo:
-            health_check.main()
+        result = check_url(url)
         
-        assert excinfo.value.code == 0
+        assert result["success"] is False
+        assert result["status_code"] == 404
+        assert "HTTP status code: 404" in result["errors"]
+    
+    @responses.activate
+    def test_check_url_500_error(self):
+        url = "https://example.com/error"
+        responses.add(responses.GET, url, status=500)
         
-        captured = capsys.readouterr()
-        report = json.loads(captured.out)
-        assert report['results'][0]['keyword_found'] is True
+        result = check_url(url)
+        
+        assert result["success"] is False
+        assert result["status_code"] == 500
+        assert "HTTP status code: 500" in result["errors"]
+    
+    def test_check_url_connection_error(self):
+        url = "https://nonexistent.example.invalid"
+        
+        result = check_url(url, timeout=1)
+        
+        assert result["success"] is False
+        assert len(result["errors"]) > 0
+        assert "Request failed:" in result["errors"][0]
+    
+    @responses.activate
+    def test_check_url_multiple_keywords(self):
+        url = "https://example.com"
+        responses.add(responses.GET, url, status=200, body="Hello World API")
+        
+        result = check_url(url, keywords=["Hello", "API"])
+        
+        assert result["success"] is True
+    
+    @responses.activate
+    def test_check_url_one_keyword_missing(self):
+        url = "https://example.com"
+        responses.add(responses.GET, url, status=200, body="Hello World")
+        
+        result = check_url(url, keywords=["Hello", "API"])
+        
+        assert result["success"] is False
+        assert "Keyword not found: 'API'" in result["errors"]
+
+
+class TestFailurePersistence:
+    def test_load_empty_failure_counts(self):
+        counts = load_failure_counts()
+        assert counts == {}
+    
+    def test_save_and_load_failure_counts(self):
+        test_data = {
+            "https://example.com": {
+                "consecutive_failures": 2,
+                "last_alert_time": 1234567890,
+                "last_status": "failed"
+            }
+        }
+        
+        save_failure_counts(test_data)
+        loaded = load_failure_counts()
+        
+        assert loaded == test_data
+    
+    def test_update_failure_count_success(self):
+        url = "https://example.com"
+        
+        stats = update_failure_count(url, success=True)
+        
+        assert stats["consecutive_failures"] == 0
+        assert stats["last_status"] == "success"
+        
+        counts = load_failure_counts()
+        assert url in counts
+    
+    def test_update_failure_count_failure(self):
+        url = "https://example.com"
+        
+        stats = update_failure_count(url, success=False)
+        
+        assert stats["consecutive_failures"] == 1
+        assert stats["last_status"] == "failed"
+    
+    def test_update_failure_count_multiple_failures(self):
+        url = "https://example.com"
+        
+        update_failure_count(url, success=False)
+        update_failure_count(url, success=False)
+        stats = update_failure_count(url, success=False)
+        
+        assert stats["consecutive_failures"] == 3
+    
+    def test_update_failure_count_reset_on_success(self):
+        url = "https://example.com"
+        
+        update_failure_count(url, success=False)
+        update_failure_count(url, success=False)
+        stats = update_failure_count(url, success=True)
+        
+        assert stats["consecutive_failures"] == 0
+
+
+class TestAlertLogic:
+    def test_should_not_alert_below_threshold(self):
+        stats = {"consecutive_failures": 2, "last_alert_time": 0}
+        assert should_send_alert(stats) is False
+    
+    def test_should_alert_at_threshold(self):
+        stats = {"consecutive_failures": 3, "last_alert_time": 0}
+        assert should_send_alert(stats) is True
+    
+    def test_should_not_alert_within_cooldown(self):
+        current_time = time.time()
+        stats = {"consecutive_failures": 3, "last_alert_time": current_time - 1800}
+        assert should_send_alert(stats) is False
+    
+    def test_should_alert_after_cooldown(self):
+        current_time = time.time()
+        stats = {"consecutive_failures": 3, "last_alert_time": current_time - 7200}
+        assert should_send_alert(stats) is True
+
+
+class TestWebhookAlerts:
+    @responses.activate
+    def test_send_dingtalk_alert_success(self):
+        webhook = "https://dingtalk.example.com/webhook"
+        responses.add(responses.POST, webhook, status=200)
+        
+        result = send_dingtalk_alert(
+            webhook,
+            "https://example.com",
+            ["HTTP status code: 500"],
+            3
+        )
+        
+        assert result is True
+        assert len(responses.calls) == 1
+    
+    @responses.activate
+    def test_send_dingtalk_alert_failure(self):
+        webhook = "https://dingtalk.example.com/webhook"
+        responses.add(responses.POST, webhook, status=500)
+        
+        result = send_dingtalk_alert(
+            webhook,
+            "https://example.com",
+            ["Connection error"],
+            3
+        )
+        
+        assert result is False
+    
+    @responses.activate
+    def test_send_wechat_alert_success(self):
+        webhook = "https://qyapi.weixin.qq.com/webhook"
+        responses.add(responses.POST, webhook, status=200)
+        
+        result = send_wechat_alert(
+            webhook,
+            "https://example.com",
+            ["HTTP status code: 500"],
+            3
+        )
+        
+        assert result is True
+        assert len(responses.calls) == 1
+    
+    @responses.activate
+    def test_send_wechat_alert_failure(self):
+        webhook = "https://qyapi.weixin.qq.com/webhook"
+        responses.add(responses.POST, webhook, status=404)
+        
+        result = send_wechat_alert(
+            webhook,
+            "https://example.com",
+            ["Connection error"],
+            3
+        )
+        
+        assert result is False
+
+
+class TestIntegration:
+    @responses.activate
+    def test_full_success_scenario(self):
+        url = "https://example.com"
+        responses.add(responses.GET, url, status=200, body="OK")
+        
+        result = check_url(url)
+        stats = update_failure_count(url, result["success"])
+        
+        assert result["success"] is True
+        assert stats["consecutive_failures"] == 0
+        assert should_send_alert(stats) is False
+    
+    @responses.activate
+    def test_alert_trigger_after_3_failures(self):
+        url = "https://example.com"
+        
+        for i in range(3):
+            responses.add(responses.GET, url, status=500)
+            result = check_url(url)
+            stats = update_failure_count(url, result["success"])
+        
+        assert stats["consecutive_failures"] == 3
+        assert should_send_alert(stats) is True
+    
+    @responses.activate
+    def test_alert_not_trigger_before_3_failures(self):
+        url = "https://example.com"
+        
+        for i in range(2):
+            responses.add(responses.GET, url, status=500)
+            result = check_url(url)
+            stats = update_failure_count(url, result["success"])
+        
+        assert stats["consecutive_failures"] == 2
+        assert should_send_alert(stats) is False

@@ -1,0 +1,66 @@
+name: Dependency Updates Checker
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # 每周一 UTC 0 点
+  workflow_dispatch:
+    inputs:
+      allow_major:
+        description: 'Allow major version updates'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install packaging requests tomli
+      
+      - name: Run dependency checker
+        id: check
+        run: |
+          ARGS="--file requirements.txt --report update_report.md --base-branch main"
+          
+          if [ "${{ github.event.inputs.allow_major }}" = "true" ]; then
+            ARGS="$ARGS --allow-major"
+          fi
+          
+          echo "Running with args: $ARGS"
+          python $GITHUB_WORKSPACE/dep_updater.py $ARGS
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+      
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-report
+          path: update_report.md
+      
+      - name: Job Summary
+        run: |
+          cat update_report.md >> $GITHUB_STEP_SUMMARY
+      
+      - name: Send notification (optional)
+        if: success()
+        run: |
+          echo "Dependency check completed successfully!"
+          echo "Report has been uploaded as an artifact"

@@ -45,3 +45,7 @@ build/
 # Python virtual environments
 venv/
 env/
+
+# Rust
+target/
+Cargo.lock
