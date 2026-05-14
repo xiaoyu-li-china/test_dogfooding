@@ -45,6 +45,3 @@ build/
 # Python virtual environments
 venv/
 env/
-
-# Project specific
-data/
