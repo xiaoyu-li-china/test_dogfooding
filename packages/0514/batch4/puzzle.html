@@ -71,6 +71,21 @@
             gap: 15px;
             margin-top: 20px;
             justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn-undo {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        .btn-undo:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(56, 239, 125, 0.4);
+        }
+        .btn-undo:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         button {
             padding: 12px 30px;
@@ -193,11 +208,13 @@
         <div class="instructions">点击空白块相邻的拼图块进行移动</div>
         <canvas id="puzzleCanvas" width="450" height="450"></canvas>
         <div class="controls">
-            <button class="btn-primary" id="shuffleBtn">重新打乱</button>
+            <button class="btn-primary" id="restartBtn">重新开始</button>
+            <button class="btn-undo" id="undoBtn">撤销</button>
             <button class="btn-hint" id="hintBtn">提示<span class="hint-cost">(-10步)</span></button>
             <button class="btn-secondary" id="previewBtn">预览原图</button>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 
     <div class="modal" id="winModal">
         <div class="modal-content">
@@ -226,6 +243,10 @@
         let hintTile = null;
         let hintTimeout = null;
         const HINT_COST = 10;
+        let isAnimating = false;
+        const ANIMATION_DURATION = 150;
+        const MAX_UNDO_STEPS = 10;
+        let history = [];
 
         const colors = [
             '#FF6B6B', '#4ECDC4', '#45B7D1',
@@ -299,25 +320,94 @@
             return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
         }
 
-        function moveTile(row, col) {
-            if (isWon) return;
+        function saveHistory() {
+            const state = {
+                tiles: tiles.map(row => [...row]),
+                emptyTile: { ...emptyTile },
+                moves: moves
+            };
+            history.push(state);
+            if (history.length > MAX_UNDO_STEPS) {
+                history.shift();
+            }
+            updateUndoButton();
+        }
+
+        function updateUndoButton() {
+            const undoBtn = document.getElementById('undoBtn');
+            undoBtn.disabled = history.length === 0;
+        }
+
+        function moveTile(row, col, isUndo = false) {
+            if (isAnimating) return;
+            if (isWon && !isUndo) return;
             if (!isAdjacent(row, col)) return;
             
-            tiles[emptyTile.row][emptyTile.col] = tiles[row][col];
-            tiles[row][col] = 0;
-            emptyTile = { row, col };
-            
-            moves++;
-            document.getElementById('moves').textContent = moves;
-            updateHintButton();
-            
-            if (!gameStarted) {
-                startTimer();
-                gameStarted = true;
+            if (!isUndo) {
+                saveHistory();
             }
             
-            drawBoard();
-            checkWin();
+            isAnimating = true;
+            
+            const startX = col * tileSize;
+            const startY = row * tileSize;
+            const endX = emptyTile.col * tileSize;
+            const endY = emptyTile.row * tileSize;
+            const number = tiles[row][col];
+            
+            const startTime = Date.now();
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / ANIMATION_DURATION, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                const currentX = startX + (endX - startX) * easeProgress;
+                const currentY = startY + (endY - startY) * easeProgress;
+                
+                drawBoard();
+                
+                const colorIndex = row * gridSize + col;
+                ctx.fillStyle = colors[colorIndex];
+                ctx.fillRect(currentX + 2, currentY + 2, tileSize - 4, tileSize - 4);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(currentX + 2, currentY + 2, tileSize - 4, tileSize - 4);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 48px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(number.toString(), currentX + tileSize / 2, currentY + tileSize / 2);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    tiles[emptyTile.row][emptyTile.col] = tiles[row][col];
+                    tiles[row][col] = 0;
+                    emptyTile = { row, col };
+                    
+                    if (!isUndo) {
+                        moves++;
+                        document.getElementById('moves').textContent = moves;
+                        updateHintButton();
+                        
+                        if (!gameStarted) {
+                            startTimer();
+                            gameStarted = true;
+                        }
+                    }
+                    
+                    drawBoard();
+                    isAnimating = false;
+                    
+                    if (!isUndo) {
+                        checkWin();
+                    }
+                }
+            }
+            
+            animate();
         }
 
         function shuffleTiles() {
@@ -458,14 +548,42 @@
             document.getElementById('timer').textContent = `${mins}:${secs}`;
         }
 
+        function undo() {
+            if (history.length === 0 || isAnimating) return;
+            
+            const prevState = history.pop();
+            tiles = prevState.tiles.map(row => [...row]);
+            emptyTile = { ...prevState.emptyTile };
+            moves = prevState.moves;
+            
+            document.getElementById('moves').textContent = moves;
+            updateHintButton();
+            updateUndoButton();
+            
+            if (isWon) {
+                isWon = false;
+                hideWinModal();
+            }
+            
+            drawBoard();
+        }
+
+        function restartGame() {
+            if (isAnimating) return;
+            resetGame();
+            shuffleTiles();
+        }
+
         function resetGame() {
             stopTimer();
             seconds = 0;
             moves = 0;
             gameStarted = false;
             isWon = false;
+            history = [];
             document.getElementById('moves').textContent = '0';
             document.getElementById('timer').textContent = '00:00';
+            updateUndoButton();
             initTiles();
         }
 
@@ -478,12 +596,6 @@
         function hideWinModal() {
             document.getElementById('winModal').style.display = 'none';
         }
-
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let touchStartTime = 0;
-        const SWIPE_THRESHOLD = 30;
-        const CLICK_THRESHOLD = 200;
 
         function getTilePosition(e) {
             const rect = canvas.getBoundingClientRect();
@@ -500,51 +612,50 @@
             moveTile(pos.row, pos.col);
         });
 
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-            touchStartTime = Date.now();
-        }, { passive: false });
-
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-        }, { passive: false });
-
-        canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            const touch = e.changedTouches[0];
-            const touchEndX = touch.clientX;
-            const touchEndY = touch.clientY;
-            const touchEndTime = Date.now();
-            
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
-            const deltaTime = touchEndTime - touchStartTime;
-            
-            const absX = Math.abs(deltaX);
-            const absY = Math.abs(deltaY);
-            
-            if (absX < SWIPE_THRESHOLD && absY < SWIPE_THRESHOLD && deltaTime < CLICK_THRESHOLD) {
-                const pos = getTilePosition({ clientX: touchEndX, clientY: touchEndY });
-                moveTile(pos.row, pos.col);
-            } else if (absX > absY) {
-                if (deltaX > SWIPE_THRESHOLD) {
-                    moveTile(emptyTile.row, emptyTile.col - 1);
-                } else if (deltaX < -SWIPE_THRESHOLD) {
-                    moveTile(emptyTile.row, emptyTile.col + 1);
-                }
-            } else {
-                if (deltaY > SWIPE_THRESHOLD) {
-                    moveTile(emptyTile.row - 1, emptyTile.col);
-                } else if (deltaY < -SWIPE_THRESHOLD) {
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
                     moveTile(emptyTile.row + 1, emptyTile.col);
-                }
+                    break;
+                case 'ArrowDown':
+                    moveTile(emptyTile.row - 1, emptyTile.col);
+                    break;
+                case 'ArrowLeft':
+                    moveTile(emptyTile.row, emptyTile.col + 1);
+                    break;
+                case 'ArrowRight':
+                    moveTile(emptyTile.row, emptyTile.col - 1);
+                    break;
             }
-        }, { passive: false });
+        });
 
-        document.getElementById('shuffleBtn').addEventListener('click', shuffleTiles);
+        const hammer = new Hammer(canvas);
+        hammer.get('swipe').set({ direction: Hammer.DIRECTION_ALL });
+
+        hammer.on('swipe', (e) => {
+            switch (e.direction) {
+                case Hammer.DIRECTION_UP:
+                    moveTile(emptyTile.row + 1, emptyTile.col);
+                    break;
+                case Hammer.DIRECTION_DOWN:
+                    moveTile(emptyTile.row - 1, emptyTile.col);
+                    break;
+                case Hammer.DIRECTION_LEFT:
+                    moveTile(emptyTile.row, emptyTile.col + 1);
+                    break;
+                case Hammer.DIRECTION_RIGHT:
+                    moveTile(emptyTile.row, emptyTile.col - 1);
+                    break;
+            }
+        });
+
+        hammer.on('tap', (e) => {
+            const pos = getTilePosition(e.srcEvent);
+            moveTile(pos.row, pos.col);
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
+        document.getElementById('undoBtn').addEventListener('click', undo);
         
         document.getElementById('previewBtn').addEventListener('mousedown', () => {
             initTiles();

@@ -1,0 +1,36 @@
+{
+  "name": "video-recorder-app",
+  "version": "1.0.0",
+  "description": "带有修复最后一帧丢失和内存溢出问题的视频录制应用",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:electron": "playwright test recorder.spec.js",
+    "install:playwright": "playwright install --with-deps chromium electron"
+  },
+  "keywords": [
+    "electron",
+    "video-recorder",
+    "screen-recorder",
+    "annotation",
+    "playwright"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "electron": "^28.0.0",
+    "playwright": "^1.40.0"
+  },
+  "dependencies": {
+    "fs-extra": "^11.2.0"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/video-recorder-app/issues"
+  },
+  "homepage": "https://github.com/your-username/video-recorder-app#readme"
+}

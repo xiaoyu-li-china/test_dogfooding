@@ -1,0 +1,6 @@
+# 测试主机列表（包含无效域名）
+8.8.8.8
+1.1.1.1
+invalid-domain-that-does-not-exist-12345.com
+google.com
+this-is-another-invalid-domain-test-xyz.com
